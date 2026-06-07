@@ -17,16 +17,22 @@ DB_URL = 'https://lviv-transport-web-default-rtdb.firebaseio.com/'
 STATIC_URL = "http://track.ua-gis.com/gtfs/lviv/static.zip"
 REALTIME_URL = "http://track.ua-gis.com/gtfs/lviv/vehicle_position"
 MAPPING_FILE = "public/mapping.json"
-HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+# Заголовок для імітації браузера
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+}
 
 # --- Ініціалізація Firebase ---
 if not firebase_admin._apps:
     json_env = os.environ.get('FIREBASE_JSON')
     if json_env:
-        firebase_config = json.loads(json_env)
-        cred = credentials.Certificate(firebase_config)
-        firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
-        print("✅ Firebase ініціалізовано.")
+        try:
+            firebase_config = json.loads(json_env)
+            cred = credentials.Certificate(firebase_config)
+            firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
+            print("✅ Firebase ініціалізовано.")
+        except Exception as e:
+            print(f"❌ Помилка ініціалізації Firebase: {e}")
     else:
         print("❌ ПОМИЛКА: Змінна FIREBASE_JSON не знайдена!")
 
@@ -63,7 +69,7 @@ def run_collector():
     while True:
         try:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Спроба отримати дані з track.ua-gis.com...")
-            # Додано таймаут 20 секунд
+            # Додано таймаут 20 секунд і заголовки
             response = requests.get(REALTIME_URL, timeout=20, headers=HEADERS)
             
             if response.status_code == 200:
@@ -96,16 +102,16 @@ def run_collector():
                             payload[raw_id] = vehicle_data
                     
                     ref_vehicles.update(payload)
-                    print(f"💾 Успішно оновлено Firebase.")
+                    print(f"💾 Успішно оновлено {len(payload)} ТЗ у Firebase.")
             else:
                 print(f"❌ Помилка сервера міста: статус {response.status_code}")
                 
         except Exception as e:
             print(f"❌ КРИТИЧНА ПОМИЛКА: {e}")
             
-        time.sleep(30) # Пауза перед наступним запитом
+        time.sleep(30) # Пауза 30 секунд
 
-# ЗАПУСК ФОНОВОГО ПОТОКУ
+# Запуск фонового потоку (поза блоком if)
 threading.Thread(target=run_collector, daemon=True).start()
 
 if __name__ == "__main__":
