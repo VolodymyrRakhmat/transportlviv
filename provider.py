@@ -25,10 +25,11 @@ if not firebase_admin._apps:
         firebase_config = json.loads(json_env)
         cred = credentials.Certificate(firebase_config)
         firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
+        print("Firebase ініціалізовано.")
     else:
         print("ПОМИЛКА: Змінна FIREBASE_JSON не знайдена!")
 
-# Flask-сервер
+# Flask-сервер (потрібен для Render)
 app = Flask(__name__)
 
 @app.route('/')
@@ -57,75 +58,58 @@ def load_mapping():
         return {}
 
 def run_collector():
-    # Записуємо дані у гілку 'vehicles', як того хоче сайт
+    print("Колектор даних запущено!")
     ref_vehicles = db.reference('vehicles') 
     ref_alerts = db.reference('alerts')
-    ref_history = db.reference('history')
     
-    last_history_save = 0
-    HISTORY_INTERVAL = 300 
-    
-    print("Колектор даних запущено!")
     while True:
         try:
-            mapping = load_mapping()
-            routes_map = get_routes_map()
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Спроба отримати дані з track.ua-gis.com...")
             
-            feed = gtfs_realtime_pb2.FeedMessage()
-            response = requests.get(REALTIME_URL, timeout=15)
-            feed.ParseFromString(response.content)
+            response = requests.get(REALTIME_URL, timeout=20)
             
-            payload = {}
-            alerts_payload = {}
-            history_snapshot = {}
-            current_ts = time.time()
-            current_date = datetime.now().strftime('%Y-%m-%d')
-            current_time_str = datetime.now().strftime('%H:%M')
-
-            for entity in feed.entity:
-                if entity.HasField('vehicle'):
-                    v = entity.vehicle
-                    raw_id = v.vehicle.id
-                    name = routes_map.get(str(v.trip.route_id), "Unknown")
+            if response.status_code == 200:
+                feed = gtfs_realtime_pb2.FeedMessage()
+                feed.ParseFromString(response.content)
+                
+                if len(feed.entity) == 0:
+                    print("Отримано порожню відповідь від сервера міста.")
+                else:
+                    print(f"Отримано {len(feed.entity)} ТЗ. Обробка...")
+                    mapping = load_mapping()
+                    routes_map = get_routes_map()
+                    payload = {}
                     
-                    is_identified = raw_id in mapping
-                    display_val = mapping[raw_id][0] if is_identified else raw_id
+                    for entity in feed.entity:
+                        if entity.HasField('vehicle'):
+                            v = entity.vehicle
+                            raw_id = v.vehicle.id
+                            name = routes_map.get(str(v.trip.route_id), "Unknown")
+                            vehicle_data = {
+                                'lat': v.position.latitude,
+                                'lng': v.position.longitude,
+                                'r': name,
+                                'type': v.vehicle.label,
+                                'p': mapping.get(raw_id, [raw_id])[0] if raw_id in mapping else raw_id,
+                                'b': float(v.position.bearing) if v.position.HasField('bearing') else 0.0,
+                                's': v.position.speed if v.position.HasField('speed') else 0.0,
+                                'last_updated': int(time.time())
+                            }
+                            payload[raw_id] = vehicle_data
                     
-                    vehicle_data = {
-                        'lat': v.position.latitude,
-                        'lng': v.position.longitude,
-                        'r': name,
-                        'type': v.vehicle.label,
-                        'p': display_val,
-                        'raw_p': raw_id,
-                        'b': float(v.position.bearing) if v.position.HasField('bearing') else 0.0,
-                        's': v.position.speed if v.position.HasField('speed') else 0.0,
-                        'timestamp': current_time_str,
-                        'updated_at': datetime.now().isoformat()
-                    }
-
-                    payload[raw_id] = vehicle_data
-                    if not is_identified:
-                        alerts_payload[raw_id] = {'id': raw_id, 'route': name, 'time': current_time_str}
-                    if current_ts - last_history_save >= HISTORY_INTERVAL:
-                        history_snapshot[raw_id] = vehicle_data
-
-            if payload:
-                ref_vehicles.update(payload)
-            ref_alerts.set(alerts_payload)
-            
-            if history_snapshot:
-                history_key = current_time_str.replace(':', '-')
-                ref_history.child(current_date).child(history_key).set(history_snapshot)
-                last_history_save = current_ts
-
-            print(f"[{current_time_str}] Оновлено {len(payload)} ТЗ")
-            time.sleep(11)
-
+                    ref_vehicles.update(payload)
+                    print(f"Успішно оновлено {len(payload)} ТЗ у Firebase.")
+            else:
+                print(f"Помилка сервера міста: статус {response.status_code}")
+                
         except Exception as e:
-            print(f"Помилка циклу: {e}")
-            time.sleep(60)
+            print(f"КРИТИЧНА ПОМИЛКА в циклі: {e}")
+            
+        time.sleep(30) # Пауза 30 секунд
 
-# --- ЗАПУСК ---
-# Запускаємо збір даних у фоновому потоці ОДРАЗУ
+# Запуск колектора у фоновому потоці
 threading.Thread(target=run_collector, daemon=True).start()
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
