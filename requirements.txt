@@ -1,0 +1,6 @@
+firebase-admin
+requests
+pandas
+google-transit
+flask
+gunicorn
