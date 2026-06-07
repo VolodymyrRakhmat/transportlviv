@@ -17,7 +17,6 @@ DB_URL = 'https://lviv-transport-web-default-rtdb.firebaseio.com/'
 STATIC_URL = "http://track.ua-gis.com/gtfs/lviv/static.zip"
 REALTIME_URL = "http://track.ua-gis.com/gtfs/lviv/vehicle_position"
 MAPPING_FILE = "public/mapping.json"
-# Заголовок для імітації браузера
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
 
 # --- Ініціалізація Firebase ---
@@ -27,11 +26,10 @@ if not firebase_admin._apps:
         firebase_config = json.loads(json_env)
         cred = credentials.Certificate(firebase_config)
         firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
-        print("Firebase ініціалізовано.")
+        print("✅ Firebase ініціалізовано.")
     else:
-        print("ПОМИЛКА: Змінна FIREBASE_JSON не знайдена!")
+        print("❌ ПОМИЛКА: Змінна FIREBASE_JSON не знайдена!")
 
-# Flask-сервер
 app = Flask(__name__)
 
 @app.route('/')
@@ -46,7 +44,7 @@ def get_routes_map():
             routes = pd.read_csv(f)
             return {str(row['route_id']).strip(): str(row['route_short_name']).strip() for _, row in routes.iterrows()}
     except Exception as e:
-        print(f"Помилка завантаження маршрутів: {e}")
+        print(f"⚠️ Помилка завантаження маршрутів: {e}")
         return {}
 
 def load_mapping():
@@ -56,16 +54,16 @@ def load_mapping():
                 return json.load(f)
         return {}
     except Exception as e:
-        print(f"Помилка завантаження mapping.json: {e}")
         return {}
 
 def run_collector():
-    print("Колектор даних запущено!")
+    print("🚀 Колектор даних запущено!")
     ref_vehicles = db.reference('vehicles') 
     
     while True:
         try:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Спроба отримати дані з track.ua-gis.com...")
+            # Додано таймаут 20 секунд
             response = requests.get(REALTIME_URL, timeout=20, headers=HEADERS)
             
             if response.status_code == 200:
@@ -73,9 +71,9 @@ def run_collector():
                 feed.ParseFromString(response.content)
                 
                 if len(feed.entity) == 0:
-                    print("Отримано порожню відповідь від сервера міста.")
+                    print("⚠️ Отримано порожню відповідь від сервера міста.")
                 else:
-                    print(f"Отримано {len(feed.entity)} ТЗ. Обробка...")
+                    print(f"✅ Отримано {len(feed.entity)} ТЗ. Обробка...")
                     mapping = load_mapping()
                     routes_map = get_routes_map()
                     payload = {}
@@ -98,16 +96,16 @@ def run_collector():
                             payload[raw_id] = vehicle_data
                     
                     ref_vehicles.update(payload)
-                    print(f"Успішно оновлено {len(payload)} ТЗ у Firebase.")
+                    print(f"💾 Успішно оновлено Firebase.")
             else:
-                print(f"Помилка сервера міста: статус {response.status_code}")
+                print(f"❌ Помилка сервера міста: статус {response.status_code}")
                 
         except Exception as e:
-            print(f"КРИТИЧНА ПОМИЛКА в циклі: {e}")
+            print(f"❌ КРИТИЧНА ПОМИЛКА: {e}")
             
-        time.sleep(30)
+        time.sleep(30) # Пауза перед наступним запитом
 
-# Запуск колектора у фоновому потоці ОДРАЗУ
+# ЗАПУСК ФОНОВОГО ПОТОКУ
 threading.Thread(target=run_collector, daemon=True).start()
 
 if __name__ == "__main__":
