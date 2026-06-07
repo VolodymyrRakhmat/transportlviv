@@ -20,19 +20,22 @@ MAPPING_FILE = "public/mapping.json"
 
 # --- Ініціалізація Firebase ---
 if not firebase_admin._apps:
-    # Отримуємо ключ із змінної оточення Render (захищений спосіб)
-    firebase_config = json.loads(os.environ.get('FIREBASE_JSON'))
-    cred = credentials.Certificate(firebase_config)
-    firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
+    # Отримуємо JSON-рядок із змінної оточення
+    json_env = os.environ.get('FIREBASE_JSON')
+    if json_env:
+        firebase_config = json.loads(json_env)
+        cred = credentials.Certificate(firebase_config)
+        firebase_admin.initialize_app(cred, {'databaseURL': DB_URL})
+    else:
+        print("ПОМИЛКА: Змінна FIREBASE_JSON не знайдена!")
 
-# Flask-сервер, щоб Render не вимикав ваш безкоштовний сервіс
+# Flask-сервер
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return "Моніторинг працює!"
 
-# Ваша оригінальна функція маппінгу
 def get_routes_map():
     try:
         r = requests.get(STATIC_URL, timeout=30)
@@ -44,23 +47,24 @@ def get_routes_map():
         print(f"Помилка завантаження маршрутів: {e}")
         return {}
 
-# Ваша оригінальна функція завантаження маппінгу
 def load_mapping():
     try:
-        with open(MAPPING_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        if os.path.exists(MAPPING_FILE):
+            with open(MAPPING_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
     except Exception as e:
         print(f"Помилка завантаження mapping.json: {e}")
         return {}
 
-# Ваш оригінальний цикл збору даних
 def run_collector():
-    ref_live = db.reference('live')
+    # ТУТ ЗМІНЕНО НА 'vehicles', ЩОБ САЙТ БАЧИВ ДАНІ
+    ref_live = db.reference('vehicles') 
     ref_alerts = db.reference('alerts')
     ref_history = db.reference('history')
     
     last_history_save = 0
-    HISTORY_INTERVAL = 300 # 5 хвилин
+    HISTORY_INTERVAL = 300 
     
     while True:
         try:
@@ -123,9 +127,6 @@ def run_collector():
             time.sleep(60)
 
 if __name__ == "__main__":
-    # Запуск збору даних у фоновому потоці
     threading.Thread(target=run_collector, daemon=True).start()
-    
-    # Запуск Flask-сервера
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
