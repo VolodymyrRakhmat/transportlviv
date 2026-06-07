@@ -1,6 +1,6 @@
 firebase-admin
 requests
 pandas
-google-transit
+gtfs-realtime-bindings
 flask
 gunicorn
