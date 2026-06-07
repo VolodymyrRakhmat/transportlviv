@@ -20,7 +20,6 @@ MAPPING_FILE = "public/mapping.json"
 
 # --- Ініціалізація Firebase ---
 if not firebase_admin._apps:
-    # Отримуємо JSON-рядок із змінної оточення
     json_env = os.environ.get('FIREBASE_JSON')
     if json_env:
         firebase_config = json.loads(json_env)
@@ -58,14 +57,15 @@ def load_mapping():
         return {}
 
 def run_collector():
-    # ТУТ ЗМІНЕНО НА 'vehicles', ЩОБ САЙТ БАЧИВ ДАНІ
-    ref_live = db.reference('vehicles') 
+    # Записуємо дані у гілку 'vehicles', як того хоче сайт
+    ref_vehicles = db.reference('vehicles') 
     ref_alerts = db.reference('alerts')
     ref_history = db.reference('history')
     
     last_history_save = 0
     HISTORY_INTERVAL = 300 
     
+    print("Колектор даних запущено!")
     while True:
         try:
             mapping = load_mapping()
@@ -111,7 +111,7 @@ def run_collector():
                         history_snapshot[raw_id] = vehicle_data
 
             if payload:
-                ref_live.update(payload)
+                ref_vehicles.update(payload)
             ref_alerts.set(alerts_payload)
             
             if history_snapshot:
@@ -126,7 +126,6 @@ def run_collector():
             print(f"Помилка циклу: {e}")
             time.sleep(60)
 
-if __name__ == "__main__":
-    threading.Thread(target=run_collector, daemon=True).start()
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+# --- ЗАПУСК ---
+# Запускаємо збір даних у фоновому потоці ОДРАЗУ
+threading.Thread(target=run_collector, daemon=True).start()
