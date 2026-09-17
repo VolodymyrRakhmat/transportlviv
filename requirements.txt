@@ -1,6 +1,4 @@
-firebase-admin
 requests
 pandas
+firebase-admin
 gtfs-realtime-bindings
-flask
-gunicorn
