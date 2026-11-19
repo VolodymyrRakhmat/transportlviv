@@ -1,0 +1,17 @@
+[Unit]
+Description=Lviv transit monitor (provider.py -> Firebase)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=transit
+WorkingDirectory=/opt/transit-monitor
+EnvironmentFile=/etc/transit-monitor.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/transit-monitor/venv/bin/python provider.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

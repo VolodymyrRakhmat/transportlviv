@@ -1,4 +1,8 @@
 serviceAccountKey.json
 .env
 key/
-.firebase/
+.firebase/1.py
+2.py
+public/стопи для 17-84 на 13.11/
+__pycache__/
+*.db

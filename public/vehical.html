@@ -1,0 +1,2598 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Адмін-панель — vehicle_mapping</title>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #eef1f8;
+            --surface: #ffffff;
+            --surface-2: #f7f9fd;
+            --border: #e3e7f1;
+            --text: #1c2333;
+            --text-muted: #6b7488;
+            --primary: #4f46e5;
+            --primary-2: #06b6d4;
+            --success: #16a34a;
+            --success-bg: #e8faf0;
+            --warning: #d97706;
+            --warning-bg: #fff8e6;
+            --danger: #dc2626;
+            --danger-bg: #fdecec;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --shadow: 0 1px 2px rgba(15,23,42,.04), 0 10px 28px rgba(30,41,79,.07);
+            --shadow-hover: 0 6px 14px rgba(15,23,42,.08), 0 20px 40px rgba(30,41,79,.12);
+            --field-height: 40px;
+            --field-width-extra: 0px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 28px 20px 60px;
+            margin: 0;
+            color: var(--text);
+            background:
+                radial-gradient(1100px 550px at 8% -12%, #e6e9ff 0%, transparent 60%),
+                radial-gradient(900px 480px at 108% -6%, #dffaff 0%, transparent 55%),
+                var(--bg);
+            min-height: 100vh;
+        }
+
+        ::-webkit-scrollbar { height: 10px; width: 10px; }
+        ::-webkit-scrollbar-thumb { background: #c7cee0; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a6b0cb; }
+
+        .container { max-width: 1360px; margin: 0 auto; }
+
+        h2, h3, h4 { font-family: 'Manrope', 'Inter', sans-serif; letter-spacing: -.01em; }
+        h3 { font-size: 1.4em; margin: 6px 0 18px; }
+        h4 { margin: 0 0 10px; font-size: 1.05em; }
+
+        .list-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: start; }
+        @media (max-width: 1000px) { .list-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 650px) { .list-grid { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--surface);
+            padding: 16px 16px 14px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+        .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); }
+
+        input, select, textarea {
+            padding: 10px 12px; margin: 5px 0; width: 100%;
+            border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+            box-sizing: border-box; background: var(--surface-2);
+            font-family: inherit; font-size: 0.95em; color: var(--text);
+            transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none; border-color: var(--primary); background: var(--surface);
+            box-shadow: 0 0 0 4px rgba(79,70,229,.13);
+        }
+
+        button {
+            padding: 10px 16px; margin: 5px 6px 0 0; border: none; border-radius: var(--radius-sm);
+            cursor: pointer; font-weight: 700; font-size: 0.9em; letter-spacing: .1px;
+            color: #fff; transition: transform .12s ease, box-shadow .15s ease, filter .15s ease;
+        }
+        button:hover { transform: translateY(-1px); filter: brightness(1.04); }
+        button:active { transform: translateY(0); }
+
+        .btn-save    { background: linear-gradient(135deg, #16a34a, #22c55e); box-shadow: 0 4px 12px rgba(22,163,74,.28); }
+        .btn-delete  { background: linear-gradient(135deg, #dc2626, #ef4444); box-shadow: 0 4px 12px rgba(220,38,38,.28); }
+        .btn-rename  { background: linear-gradient(135deg, #4f46e5, #6366f1); box-shadow: 0 4px 12px rgba(79,70,229,.28); }
+        .btn-refresh { background: linear-gradient(135deg, #0891b2, #06b6d4); box-shadow: 0 4px 12px rgba(8,145,178,.28); }
+
+        .add-form, .filters {
+            background: var(--surface); padding: 20px; border-radius: var(--radius);
+            margin-bottom: 20px; border: 1px solid var(--border); box-shadow: var(--shadow);
+        }
+        label { font-weight: 700; display: block; margin-top: 10px; font-size: 0.86em; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+        .search { padding: 12px 14px; width: 100%; font-size: 16px; }
+
+        .login-box {
+            max-width: 400px; margin: 12vh auto; background: rgba(255,255,255,.82);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            padding: 44px 40px; border-radius: 22px;
+            border: 1px solid rgba(255,255,255,.7);
+            box-shadow: 0 24px 70px rgba(30,41,79,.25);
+            text-align: center;
+        }
+        .login-box h2 { font-size: 1.6em; margin-bottom: 4px; }
+        .login-box button {
+            background: linear-gradient(135deg, var(--primary), var(--primary-2));
+            box-shadow: 0 8px 20px rgba(79,70,229,.35);
+        }
+
+        .warning {
+            color: #9a3412; font-weight: 700; background: linear-gradient(135deg, #fff7ed, #ffedd5);
+            border: 1px solid #fed7aa; padding: 13px 16px; border-radius: var(--radius-sm); margin-bottom: 22px;
+        }
+        details summary { list-style: none; }
+        details summary::-webkit-details-marker { display: none; }
+
+        .tabs {
+            display: inline-flex; gap: 4px; margin-bottom: 24px;
+            background: var(--surface); padding: 6px; border-radius: 999px;
+            border: 1px solid var(--border); box-shadow: var(--shadow);
+        }
+        .tab-btn {
+            padding: 11px 22px; border: none; border-radius: 999px; background: transparent;
+            color: var(--text-muted); cursor: pointer; font-weight: 700; font-size: 0.92em;
+            transition: all .25s ease; box-shadow: none; margin: 0;
+        }
+        .tab-btn:hover { color: var(--text); transform: none; filter: none; }
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--primary), var(--primary-2));
+            color: white; box-shadow: 0 8px 20px rgba(79,70,229,.3);
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; animation: fadeInUp .3s ease; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        .fleet-table { width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: var(--radius-sm); overflow: hidden; }
+        .fleet-table th, .fleet-table td { border: 1px solid var(--border); padding: 9px 11px; text-align: left; }
+        .fleet-table th {
+            background: linear-gradient(135deg, #1e2749, #2a3363); color: #fff;
+            font-weight: 700; font-size: 0.85em; text-transform: uppercase; letter-spacing: .04em;
+        }
+        .fleet-table tr { background: var(--surface); transition: background .15s ease; }
+        .fleet-table tbody tr:hover, .fleet-table tr:hover { background: var(--surface-2); }
+
+        .fleet-summary {
+            background: linear-gradient(135deg, var(--success-bg), #f0fff6);
+            padding: 18px 20px; border-radius: var(--radius); font-size: 1.05em; margin-bottom: 20px;
+            border: 1px solid #bff0d1; box-shadow: var(--shadow);
+        }
+        .idle-ok td:first-child   { border-left: 4px solid var(--success); }
+        .idle-short td:first-child{ border-left: 4px solid var(--warning); }
+        .idle-long td:first-child { border-left: 4px solid var(--danger); }
+        .idle-ok    { background: var(--success-bg); }
+        .idle-short { background: var(--warning-bg); }
+
+        .row-check { width: 17px; height: 17px; cursor: pointer; margin: 0; accent-color: var(--primary); }
+        .resizable-field {
+            resize: both; overflow: auto; min-height: var(--field-height, 40px); max-height: 400px;
+            line-height: 1.35; font-family: inherit; white-space: pre-wrap;
+        }
+        .resizable-field, .cell-input, .date-field, input[list="fleet-ent-list"] {
+            min-width: calc(64px + var(--field-width-extra, 0px));
+        }
+        .field-size-bar {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            background: var(--surface); padding: 10px 16px; border-radius: var(--radius-sm);
+            border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 18px;
+            font-weight: 700; font-size: 0.88em; color: var(--text-muted);
+        }
+        .field-size-bar button { margin: 0; padding: 6px 12px; font-size: 0.85em; }
+        .field-size-bar #field-height-label,
+        .field-size-bar #field-width-label { color: var(--text); min-width: 42px; text-align: center; }
+        .field-size-bar .divider { width: 1px; align-self: stretch; background: var(--border); margin: 0 4px; }
+        .bulk-bar {
+            display: none; /* показується через JS, коли є хоч одна позначена галочка */
+            align-items: center; gap: 10px; flex-wrap: wrap;
+            position: sticky; top: 8px; z-index: 20;
+            background: linear-gradient(135deg, #eef2ff, #e0f2fe);
+            border: 1.5px solid var(--primary); box-shadow: var(--shadow-hover);
+            border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px;
+        }
+        .bulk-bar b { color: var(--primary); }
+        .bulk-bar input[list] { width: 220px; margin: 0; display: inline-block; }
+        .mismatch-actions { margin: 10px 0 4px; }
+        .idle-long  { background: var(--danger-bg); }
+
+        .fleet-ent-title { margin-top: 26px; margin-bottom: 6px; font-size: 1.15em; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .ent-actions { display: inline-flex; gap: 6px; margin-left: auto; }
+        .ent-actions button { padding: 5px 11px; margin: 0; font-size: 0.78em; }
+        .fleet-table input, .fleet-table select { padding: 6px 8px; margin: 0; font-size: 0.92em; min-width: 70px; }
+        .fleet-table td { vertical-align: middle; }
+        .table-scroll { overflow-x: auto; border-radius: var(--radius-sm); }
+
+        .mismatch-box {
+            background: linear-gradient(135deg, var(--warning-bg), #fffaf0); color: #92400e;
+            border: 1px solid #fde3ad; padding: 16px 18px; border-radius: var(--radius); margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+        .mismatch-box .btn-save { padding: 6px 12px; font-size: 0.85em; }
+
+        .stats-box { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+        .stat-chip {
+            background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 10px 16px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 8px;
+            font-size: 0.92em;
+        }
+        .stat-chip .stat-num { font-size: 1.35em; font-weight: 800; color: var(--text); font-family: 'Manrope', sans-serif; }
+        .stat-chip.type-bus       { border-color: #c7d2fe; background: #eef2ff; }
+        .stat-chip.type-trolley   { border-color: #a5f3fc; background: #ecfeff; }
+        .stat-chip.type-tram      { border-color: #fbcfe8; background: #fdf2f8; }
+        .stat-chip.type-electrobus { border-color: #99f6e4; background: #f0fdfa; }
+        .stat-chip.type-unknown   { border-color: #e2e8f0; background: #f8fafc; }
+
+        .type-badge {
+            display: inline-block; padding: 3px 10px; border-radius: 999px;
+            font-size: 0.72em; font-weight: 800; margin-left: 8px; vertical-align: middle;
+            text-transform: uppercase; letter-spacing: .03em;
+        }
+        .badge-bus       { background: #e0e7ff; color: #4338ca; }
+        .badge-trolleybus{ background: #cffafe; color: #0e7490; }
+        .badge-tram      { background: #fce7f3; color: #be185d; }
+        .badge-electrobus { background: #ccfbf1; color: #115e59; }
+        .badge-unknown   { background: #f1f5f9; color: #64748b; }
+
+
+        .odo-btn { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 5px 9px; cursor: pointer; font: inherit; font-size: .9em; box-shadow: none; white-space: nowrap; }
+        .odo-btn:hover { border-color: var(--primary); background: #eef2ff; }
+        .odo-date { font-size: .74em; color: var(--text-muted); margin-top: 2px; }
+        #odo-modal { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(15,23,42,.5); align-items: center; justify-content: center; padding: 16px; }
+        .odo-dialog { background: var(--surface); border-radius: var(--radius); width: min(820px, 100%); max-height: 92vh; overflow: auto; padding: 18px 20px 20px; box-shadow: var(--shadow-hover); }
+        .odo-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .odo-head h4 { margin: 0; }
+        .odo-close { background: transparent; color: var(--text-muted); box-shadow: none; padding: 4px 10px; font-size: 1.1em; border: none; cursor: pointer; }
+        .odo-tabs { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }
+        .odo-tabs button { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); box-shadow: none; padding: 7px 14px; border-radius: 999px; cursor: pointer; font: inherit; font-size: .88em; font-weight: 600; }
+        .odo-tabs button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .odo-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+        .odo-chart-wrap { position: relative; }
+        .odo-tip { position: absolute; pointer-events: none; background: #1c2333; color: #fff; padding: 8px 11px; border-radius: 8px; font-size: .82em; line-height: 1.45; width: 190px; box-shadow: var(--shadow-hover); }
+        .odo-hint { font-size: .8em; color: var(--text-muted); margin-top: 6px; }
+
+        .import-box { background: var(--surface-2); border: 1.5px dashed #c7cee0; border-radius: var(--radius); padding: 18px 20px; margin-bottom: 20px; }
+        .import-box summary { cursor: pointer; font-weight: 700; color: var(--primary); font-size: 1.02em; }
+        .import-box textarea { min-height: 110px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.82em; resize: vertical; }
+        .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+        .checkbox-row input { width: auto; margin: 0; }
+        .checkbox-row label { margin: 0; text-transform: none; font-size: 0.9em; letter-spacing: 0; }
+    </style>
+</head>
+<body>
+    <div id="login-screen" class="login-box">
+        <h2>🔐 Адмін-панель</h2>
+        <p style="color:var(--text-muted);">Введіть пароль:</p>
+        <form id="login-form" autocomplete="on" onsubmit="return handleLoginSubmit(event)">
+            <!-- Приховане поле "логіну" — самого лише пароля браузерам/Google
+                 Password Manager замало, щоб надійно запропонувати зберегти
+                 і потім швидко підставляти пароль; візуально його не видно,
+                 але для автозаповнення воно має лишатись справжнім полем
+                 (не display:none), інакше деякі браузери його ігнорують. -->
+            <input type="text" name="username" autocomplete="username" value="lviv-transport-admin" tabindex="-1" aria-hidden="true"
+                style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;">
+            <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Пароль" style="width: 100%; padding: 13px; font-size: 16px; margin-bottom: 15px;">
+            <button type="submit" style="width: 100%; padding: 13px; font-size: 16px;">Увійти</button>
+        </form>
+    </div>
+
+    <div id="admin-panel" class="container" style="display: none;">
+        <div class="warning">⚠️ Це адмін-панель. Не поширюйте посилання!</div>
+
+        <div class="tabs">
+            <button class="tab-btn active" id="tabbtn-mapping" onclick="showTab('mapping')">🚗 Мапінг ТЗ</button>
+            <button class="tab-btn" id="tabbtn-fleet" onclick="showTab('fleet')">🚌 Автопарк</button>
+        </div>
+
+        <div class="field-size-bar">
+            <span>↕️ Висота полів:</span>
+            <button class="btn-refresh" onclick="adjustFieldHeight(-16)" title="Зробити всі поля нижчими">➖</button>
+            <span id="field-height-label">40px</span>
+            <button class="btn-refresh" onclick="adjustFieldHeight(16)" title="Зробити всі поля вищими">➕</button>
+            <button class="btn-rename" onclick="resetFieldHeight()">↺</button>
+            <div class="divider"></div>
+            <span>↔️ Ширина полів (для всіх одразу):</span>
+            <button class="btn-refresh" onclick="adjustFieldWidth(-40)" title="Зробити всі поля вужчими">➖</button>
+            <span id="field-width-label">+0px</span>
+            <button class="btn-refresh" onclick="adjustFieldWidth(40)" title="Зробити всі поля ширшими, щоб текст вміщався">➕</button>
+            <button class="btn-rename" onclick="resetFieldWidth()">↺</button>
+        </div>
+
+        <div id="tab-mapping" class="tab-panel active">
+        <h3>Керування vehicle_mapping</h3>
+
+        <div id="mapping-summary" class="stats-box"></div>
+
+        <button onclick="clearCacheAndRefresh()" class="btn-refresh">🔄 Оновити дані з Firebase</button>
+        <button onclick="applyMappingOnServer()" class="btn-save" title="Сервер збору даних перечитає vehicle_mapping одразу, а не за розкладом">⚡ Застосувати зміни на сервері</button>
+        <span id="apply-status" style="margin-left:8px; font-size:0.9em; color:var(--text-muted);"></span>
+
+        <!-- Масовий імпорт -->
+        <details class="import-box">
+            <summary>📥 Масовий імпорт з JSON (наприклад, старий mapping.json)</summary>
+            <div style="margin-top:12px;">
+                <p style="color:var(--text-muted); font-size:0.9em; margin:0 0 8px;">
+                    Формат: <code>{"id": ["номер", 0|1 (низька підлога), 0-4 (кондиціонер), "модель"], ...}</code>.
+                    Автобуси/тролейбуси/трамваї визначаються автоматично за назвою моделі.
+                </p>
+                <label>Файл .json</label>
+                <input autocomplete="off" type="file" id="import_file" accept=".json,application/json" onchange="handleImportFile(this)">
+                <label>...або встав JSON сюди</label>
+                <textarea autocomplete="off" id="import_json" placeholder='{"5964": ["BC 7894 TC", 1, 3, "Mercedes-Benz O530 Citaro"], ...}'></textarea>
+                <div class="checkbox-row">
+                    <input autocomplete="off" type="checkbox" id="import_overwrite">
+                    <label for="import_overwrite">Перезаписувати записи, які вже є (інакше вони пропускаються)</label>
+                </div>
+                <button class="btn-save" onclick="runImport()">📥 Імпортувати</button>
+            </div>
+        </details>
+
+        <!-- Фільтри -->
+        <div class="filters">
+            <textarea autocomplete="off" id="search" class="search resizable-field" rows="1" placeholder="🔍 Пошук по ID, номеру або моделі..." onkeyup="applyFilters()"></textarea>
+
+            <div style="display:flex; gap:15px; flex-wrap:wrap; margin-top:10px;">
+                <div>
+                    <label>Сортувати за:</label>
+                    <select id="sort-by" onchange="applyFilters()">
+                        <option value="id">ID</option>
+                        <option value="model">Модель</option>
+                        <option value="climate">Кондиціонер</option>
+                        <option value="lowfloor">Низька підлога</option>
+                        <option value="odometer">Одометр (спочатку більший)</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Кондиціонер:</label>
+                    <select id="filter-climate" onchange="applyFilters()">
+                        <option value="">Всі</option>
+                        <option value="4">4 — Невідомо (пріоритет)</option>
+                        <option value="0">0 — Без кондиціонера</option>
+                        <option value="1">1 — Вентиляція</option>
+                        <option value="2">2 — Малий</option>
+                        <option value="3">3 — Повний</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Модель:</label>
+                    <select id="filter-model" onchange="applyFilters()">
+                        <option value="">Всі</option>
+                        <option value="empty">Без моделі</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Тип транспорту:</label>
+                    <select id="filter-type" onchange="applyFilters()">
+                        <option value="">Всі</option>
+                        <option value="bus">🚌 Автобус</option>
+                        <option value="trolleybus">🚎 Тролейбус</option>
+                        <option value="tram">🚋 Трамвай</option>
+                        <option value="electrobus">⚡ Електробус</option>
+                        <option value="unknown">❔ Невідомо / без моделі</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Додавання нового -->
+        <div class="add-form">
+            <h4>➕ Додати нове ТЗ</h4>
+            <textarea autocomplete="off" id="new_id" placeholder="ID ТЗ (обов'язково)" class="resizable-field" rows="1"></textarea>
+            <label>Підприємство (щоб борт одразу з'явився в автопарку)</label>
+            <input autocomplete="off" type="text" id="new_ent" list="fleet-ent-list" placeholder="Наприклад: ЛЕТ тролейбуси">
+            <label>Номер транспорту</label>
+            <textarea autocomplete="off" id="new_p" placeholder="Номер" class="resizable-field" rows="1"></textarea>
+
+            <label>Низька підлога</label>
+            <select id="new_l">
+                <option value="0">0 — Ні</option>
+                <option value="1">1 — Так</option>
+            </select>
+
+            <label>Кондиціонер</label>
+            <select id="new_c">
+                <option value="0">0 — Без кондиціонера</option>
+                <option value="1">1 — Вентиляція</option>
+                <option value="2">2 — Малий кондиціонер (½)</option>
+                <option value="3">3 — Повноцінний кондиціонер</option>
+                <option value="4">4 — Невідомо</option>
+            </select>
+
+            <label>Модель</label>
+            <textarea autocomplete="off" id="new_m" placeholder="Модель" class="resizable-field" rows="1"></textarea>
+
+            <label>Рік випуску</label>
+            <textarea autocomplete="off" id="new_y" placeholder="Рік" class="resizable-field" rows="1"></textarea>
+
+            <label>Дата виходу на лінію (перший раз)</label>
+            <input autocomplete="off" type="text" class="date-field" id="new_ls" placeholder="РРРР-ММ-ДД">
+
+            <label>Тип ТЗ</label>
+            <select id="new_t">
+                <option value="">Авто (за моделлю)</option>
+                <option value="bus">🚌 Автобус</option>
+                <option value="trolleybus">🚎 Тролейбус</option>
+                <option value="tram">🚋 Трамвай</option>
+                <option value="electrobus">⚡ Електробус</option>
+            </select>
+
+            <button onclick="addNewVehicle()">Додати новий запис</button>
+        </div>
+
+        <details class="add-form" id="swap-panel">
+            <summary style="cursor:pointer; font-weight:800;">🔀 Перестановка трекерів між бортами</summary>
+            <label>Рядки: ID трекера і новий номер борту (по одному на рядок)</label>
+            <textarea id="swap_text" rows="5" placeholder="5038 BC1111AA&#10;4021 BC2222AA&#10;4177 BC5038AA"></textarea>
+            <label>Діє з (дата і час)</label>
+            <input autocomplete="off" type="text" class="date-field dt" id="swap_from" placeholder="РРРР-ММ-ДД ГГ:ХХ">
+            <button class="btn-save" onclick="applySwap()">✅ Застосувати</button>
+            <div style="font-size:.85em;color:var(--text-muted);margin-top:6px;">Усе пишеться одним запитом. Модель/кондиціонер/низька підлога підтягуються з останнього запису цього борту. Минулу дату можна ставити — статистика перерахується за мапінгом.</div>
+        </details>
+
+        <div id="list" class="list-grid">Завантаження...</div>
+        </div>
+
+        <div id="tab-fleet" class="tab-panel">
+            <h3>🚌 Стан автопарку (за підприємствами)</h3>
+
+            <div class="add-form">
+                <h4>➕ Додати ТЗ в парк</h4>
+                <label>Підприємство</label>
+                <input autocomplete="off" type="text" id="fleet_new_ent" list="fleet-ent-list" placeholder="Наприклад: атп-1">
+                <datalist id="fleet-ent-list"></datalist>
+
+                <label>Номер</label>
+                <textarea autocomplete="off" id="fleet_new_plate" placeholder="BC 1234 XA" class="resizable-field" rows="1"></textarea>
+
+                <label>Марка / модель</label>
+                <textarea autocomplete="off" id="fleet_new_model" placeholder="Mercedes-Benz O 530 Citaro" class="resizable-field" rows="1"></textarea>
+
+                <label>Рік випуску</label>
+                <textarea autocomplete="off" id="fleet_new_year" placeholder="2012" class="resizable-field" rows="1"></textarea>
+
+                <label>Дата виходу на лінію (опційно)</label>
+                <input autocomplete="off" type="text" class="date-field" id="fleet_new_line" placeholder="РРРР-ММ-ДД">
+
+                <label>Тип транспорту</label>
+                <select id="fleet_new_type">
+                    <option value="">Авто (за моделлю)</option>
+                    <option value="bus">🚌 Автобус</option>
+                    <option value="trolleybus">🚎 Тролейбус</option>
+                    <option value="tram">🚋 Трамвай</option>
+                    <option value="electrobus">⚡ Електробус</option>
+                </select>
+
+                <label>Примітка</label>
+                <textarea autocomplete="off" id="fleet_new_note" placeholder="необов'язково" class="resizable-field" rows="1"></textarea>
+
+                <button class="btn-save" onclick="addFleetVehicle()">Додати</button>
+            </div>
+
+            <div class="filters" style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
+                <button onclick="loadFleetOverview()" class="btn-refresh">🔄 Оновити стан автопарку</button>
+                <button onclick="syncFromMapping()" class="btn-rename">🔁 Синхронізувати з мапінгом</button>
+                <button onclick="saveAllFleetRows()" class="btn-save">💾 Зберегти всі зміни в таблиці</button>
+                <div style="flex:1 1 240px; min-width:220px;">
+                    <label>Пошук (номер / модель):</label>
+                    <textarea autocomplete="off" id="fleet-search" class="search resizable-field" rows="1" placeholder="🔍 Наприклад: BC 1234 або Mercedes" oninput="renderFleetOverview()"></textarea>
+                </div>
+                <div>
+                    <label>Підприємство:</label>
+                    <select id="fleet-filter-ent" onchange="renderFleetOverview()">
+                        <option value="">Всі підприємства</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Тип транспорту:</label>
+                    <select id="fleet-filter-type" onchange="renderFleetOverview()">
+                        <option value="">Всі</option>
+                        <option value="bus">🚌 Автобус</option>
+                        <option value="trolleybus">🚎 Тролейбус</option>
+                        <option value="tram">🚋 Трамвай</option>
+                        <option value="electrobus">⚡ Електробус</option>
+                        <option value="unknown">❔ Невідомо / без моделі</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Сортувати борти за:</label>
+                    <select id="fleet-sort-by" onchange="renderFleetOverview()">
+                        <option value="plate">Номер</option>
+                        <option value="model">Марка / модель</option>
+                        <option value="type">Тип транспорту</option>
+                        <option value="year">Рік</option>
+                        <option value="idle_desc">Днів простою (спочатку найдовший)</option>
+                        <option value="idle_asc">Днів простою (спочатку найсвіжіші)</option>
+                        <option value="line_new">Вихід на лінію (спочатку нові)</option>
+                        <option value="line_old">Вихід на лінію (спочатку старі)</option>
+                        <option value="line_missing">Без дати виходу — спочатку</option>
+                        <option value="odo_desc">Одометр (спочатку більший)</option>
+                        <option value="odo_asc">Одометр (спочатку менший)</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Сортувати підприємства за:</label>
+                    <select id="fleet-sort-ent-by" onchange="renderFleetOverview()">
+                        <option value="name">Назва (А-Я)</option>
+                        <option value="count_desc">Кількість бортів (спочатку більше)</option>
+                        <option value="count_asc">Кількість бортів (спочатку менше)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="fleet-mismatch"></div>
+
+            <div class="add-form">
+                <h4>📊 Статистика виходу на лінію</h4>
+                <div id="fleet-stats">Завантаження...</div>
+            </div>
+
+            <details class="add-form" id="city-summary-box">
+                <summary style="cursor:pointer; font-weight:800; font-family:'Manrope','Inter',sans-serif; font-size:1.05em; color:var(--primary);">🏙️ Зведення по місту: скільки всього і в якому стані (натисни, щоб розгорнути)</summary>
+                <div style="font-size:.85em; color:var(--text-muted); margin:10px 0 8px;">Стан рахується за днями простою, а не «на цей момент»: 🟢 на лінії — був у треку менш ніж 3 дн. тому; 🟡 нещодавно стоїть — 3–9 дн.; 🔴 довго стоїть — 10+ дн. або ніколи не було в треку. Оновлюється кнопкою «Оновити стан автопарку».</div>
+                <div id="city-summary">Натисни «Оновити стан автопарку».</div>
+            </details>
+
+            <div class="add-form">
+                <h4>🚍 Моделі по місту і по парках</h4>
+                <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                    <div style="flex:1 1 240px;">
+                        <label>Пошук моделі</label>
+                        <input autocomplete="off" type="text" id="model-stats-search" placeholder="Наприклад: Electron або Citaro" oninput="renderModelStats()">
+                    </div>
+                    <div>
+                        <label>Тип транспорту</label>
+                        <select id="model-stats-type" onchange="renderModelStats()">
+                            <option value="">Всі</option>
+                            <option value="bus">🚌 Автобус</option>
+                            <option value="trolleybus">🚎 Тролейбус</option>
+                            <option value="tram">🚋 Трамвай</option>
+                            <option value="electrobus">⚡ Електробус</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="model-stats" style="margin-top:12px;">Натисни «Оновити стан автопарку», щоб порахувати.</div>
+            </div>
+
+            <div id="fleet-bulk-bar" class="bulk-bar">
+                <span>☑️ Позначено: <b id="bulk-count">0</b> борт(ів)</span>
+                <label style="margin:0; text-transform:none; font-weight:600;">Перенести у підприємство:</label>
+                <input autocomplete="off" type="text" id="bulk-target-ent" list="fleet-ent-list" placeholder="Наприклад: Невідомо">
+                <button class="btn-rename" onclick="bulkMoveSelected()">➡️ Перенести обрані</button>
+                <button class="btn-refresh" onclick="selectAllFleetRows()">☑️ Обрати всі показані</button>
+                <button class="btn-delete" onclick="clearAllSelections()">✖ Зняти виділення</button>
+            </div>
+
+            <div id="fleet-output"><p style="color:#777;">Натисни «Оновити», щоб завантажити дані.</p></div>
+        </div>
+    </div>
+
+    <script>
+        // ================== ЗМІНИ ПАРОЛЬ ==================
+        const ADMIN_PASSWORD = "твій_пароль_тут";   // ← Обов'язково зміни!
+        // ================================================
+
+        firebase.initializeApp({
+            databaseURL: "https://lviv-transport-web-default-rtdb.firebaseio.com",
+            projectId: "lviv-transport-web"
+        });
+
+        const dbRef = firebase.database().ref('vehicle_mapping');
+        let allData = {};
+
+        // ================== ПОЛЯ ДАТИ — ЗВИЧАЙНИЙ ТЕКСТ + АВТОФОРМАТУВАННЯ ==================
+        // Нативний <input autocomplete="off" type="date"> у більшості браузерів блокує вставку (Ctrl+V),
+        // якщо текст не збігається один-в-один з очікуваним форматом — тому Ctrl+V
+        // там "не працює" ніяк. Замість боротьби з цим обмеженням поля дати зроблені
+        // звичайним текстовим полем (клас .date-field) — туди можна вставити що
+        // завгодно, як у будь-яке інше поле. При виході з поля (blur) або одразу
+        // після вставки текст автоматично розпізнається і приводиться до формату
+        // РРРР-ММ-ДД. Якщо формат не впізнано — значення лишається як є, нічого
+        // не стирається.
+        function pad2(n) { return String(n).padStart(2, '0'); }
+        const UA_MONTHS = {
+            'січ':1,'лют':2,'бер':3,'кві':4,'тра':5,'чер':6,
+            'лип':7,'сер':8,'вер':9,'жов':10,'лис':11,'гру':12
+        };
+        function parsePastedDate(raw) {
+            const str = (raw || '').trim();
+            if (!str) return null;
+            let m;
+            // YYYY-MM-DD / YYYY.MM.DD / YYYY/MM/DD — шукаємо будь-де в тексті
+            // (працює, навіть якщо скопійовано разом з часом чи маршрутом,
+            // напр. "2026-09-05 14:23 (5)")
+            if ((m = str.match(/(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/))) {
+                return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+            }
+            // "5 вересня 2026" / "5 вер 2026" — дата словом (українські місяці)
+            if ((m = str.match(/(\d{1,2})\s+([А-Яа-яЇїІіЄєҐґ]+)\s+(\d{4})/))) {
+                const mo = UA_MONTHS[m[2].toLowerCase().slice(0, 3)];
+                if (mo) return `${m[3]}-${pad2(mo)}-${pad2(m[1])}`;
+            }
+            // DD.MM.YYYY / DD/MM/YYYY / DD-MM-YYYY
+            if ((m = str.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/))) {
+                return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
+            }
+            // DD.MM.YY (двозначний рік)
+            if ((m = str.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2})(?!\d)/))) {
+                return `20${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
+            }
+            return null;
+        }
+        function normalizeDateField(t) {
+            const iso = parsePastedDate(t.value);
+            if (!iso) return;
+            let out = iso;
+            if (t.classList.contains('dt')) {   // поля «Діє з» зберігають ще й час (ГГ:ХХ)
+                const tm = t.value.match(/(\d{1,2}):(\d{2})/);
+                if (tm) out += ' ' + pad2(tm[1]) + ':' + tm[2];
+            }
+            if (out !== t.value) t.value = out;
+        }
+        // blur — коли користувач дописав дату вручну і вийшов з поля
+        document.addEventListener('blur', function(e) {
+            const t = e.target;
+            if (!t || !t.classList || !t.classList.contains('date-field')) return;
+            normalizeDateField(t);
+        }, true);
+        // paste — щоб дата відформатувалась одразу, не чекаючи виходу з поля
+        document.addEventListener('paste', function(e) {
+            const t = e.target;
+            if (!t || !t.classList || !t.classList.contains('date-field')) return;
+            setTimeout(() => normalizeDateField(t), 0);
+        }, true);
+
+        // ================== ВИСОТА ВСІХ РОЗТЯГУВАНИХ ПОЛІВ ОДНОЧАСНО ==================
+        // Керується однією CSS-змінною --field-height на <html>, яку читає
+        // .resizable-field через min-height: var(--field-height). Змінюючи цю
+        // змінну, одразу міняємо висоту ВСІХ текстових полів на сторінці (в обох
+        // вкладках, і вже намальованих, і тих, що з'являться пізніше після
+        // перерендеру) — без потреби тягнути кожне окремо. Ручка розтягування
+        // на кожному полі (resize: vertical) лишається — нею можна підправити
+        // конкретне поле індивідуально поверх загальної висоти.
+        const FIELD_HEIGHT_MIN = 24, FIELD_HEIGHT_MAX = 300, FIELD_HEIGHT_DEFAULT = 40;
+        function getFieldHeight() {
+            const v = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--field-height'));
+            return isNaN(v) ? FIELD_HEIGHT_DEFAULT : v;
+        }
+        function setFieldHeight(px) {
+            const clamped = Math.max(FIELD_HEIGHT_MIN, Math.min(FIELD_HEIGHT_MAX, px));
+            document.documentElement.style.setProperty('--field-height', clamped + 'px');
+            const label = document.getElementById('field-height-label');
+            if (label) label.textContent = clamped + 'px';
+        }
+        window.adjustFieldHeight = function(delta) {
+            setFieldHeight(getFieldHeight() + delta);
+        };
+        window.resetFieldHeight = function() {
+            setFieldHeight(FIELD_HEIGHT_DEFAULT);
+        };
+
+        // ---- Ширина всіх полів одночасно (та сама ідея, окрема CSS-змінна
+        // --field-width-extra: додається зверху до "рідної" ширини КОЖНОГО поля,
+        // тож пропорції колонок зберігаються, просто всі стають ширшими разом). ----
+        const FIELD_WIDTH_MIN = 0, FIELD_WIDTH_MAX = 400, FIELD_WIDTH_DEFAULT = 0;
+        function getFieldWidthExtra() {
+            const v = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--field-width-extra'));
+            return isNaN(v) ? FIELD_WIDTH_DEFAULT : v;
+        }
+        function setFieldWidthExtra(px) {
+            const clamped = Math.max(FIELD_WIDTH_MIN, Math.min(FIELD_WIDTH_MAX, px));
+            document.documentElement.style.setProperty('--field-width-extra', clamped + 'px');
+            const label = document.getElementById('field-width-label');
+            if (label) label.textContent = '+' + clamped + 'px';
+        }
+        window.adjustFieldWidth = function(delta) {
+            setFieldWidthExtra(getFieldWidthExtra() + delta);
+        };
+        window.resetFieldWidth = function() {
+            setFieldWidthExtra(FIELD_WIDTH_DEFAULT);
+        };
+
+        // ================== ІСТОРІЯ ЗАКРІПЛЕННЯ БОРТУ ЗА ТРЕКЕРОМ ==================
+        function todayStr() {
+            // ВАЖЛИВО: рахуємо за МІСЦЕВИМ часом (Україна), а не через
+            // toISOString() (він у UTC). При UTC+2/+3 перші 2-3 години після
+            // місцевої півночі toISOString() ще показував "вчора" — і щойно
+            // зроблена заміна з датою "сьогодні" могла порахуватись як така,
+            // що ще не почала діяти, і активним лишався б старий запис.
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        // Приводить запис vehicle_mapping/{id} до масиву об'єктів {p,l,c,m,from},
+        // сумісно зі старим форматом [p,l,c,m] (один запис без дати).
+        function normalizeRecords(records) {
+            if (Array.isArray(records) && records.length && records[0] && typeof records[0] === 'object' && !Array.isArray(records[0])) {
+                return records.map(r => ({
+                    p: (r && typeof r.p === 'string') ? r.p : '',
+                    l: (r && r.l != null) ? r.l : 0,
+                    c: (r && r.c != null) ? r.c : 0,
+                    m: (r && typeof r.m === 'string') ? r.m : '',
+                    from: (r && typeof r.from === 'string') ? r.from : '',
+                    t: (r && typeof r.t === 'string') ? r.t : '',
+                    y: (r && typeof r.y === 'string') ? r.y : '',
+                    ls: (r && typeof r.ls === 'string') ? r.ls : ''
+                }));
+            }
+            if (Array.isArray(records) && records.length) {
+                return [{
+                    p: (typeof records[0] === 'string') ? records[0] : '',
+                    l: records[1] != null ? records[1] : 0,
+                    c: records[2] != null ? records[2] : 0,
+                    m: (typeof records[3] === 'string') ? records[3] : '',
+                    from: '',
+                    t: '',
+                    y: '',
+                    ls: ''
+                }];
+            }
+            return [];
+        }
+
+        // Індекс запису, що діє на дату dateStr: серед записів з непорожнім
+        // номером і "з" <= dateStr обирається той, у кого "з" найпізніша
+        // (при рівних датах — доданий пізніше, тобто з більшим індексом).
+        function nowStr() { const d = new Date(); return todayStr() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+        const fk = s => { s = (s || '').trim(); return !s ? '' : (s.length === 10 ? s + ' 00:00' : s.slice(0, 16)); };
+        // dateStr === сьогодні → рахуємо «зараз» (з хвилинами); інша дата → кінець тієї доби;
+        // повний «РРРР-ММ-ДД ГГ:ХХ» береться як є.
+        function getActiveIndex(list, dateStr) {
+            const w = dateStr === todayStr() ? nowStr() : (dateStr.length === 10 ? dateStr + ' 23:59' : dateStr.slice(0, 16));
+            let best = -1;
+            list.forEach((s, i) => {
+                if (!s.p) return;
+                const f = fk(s.from);
+                if (f && f > w) return;
+                if (best === -1 || f >= fk(list[best].from)) best = i;
+            });
+            return best;
+        }
+
+        // Запис для фільтрів/сортування/пошуку: діючий "сьогодні",
+        // або перший заповнений, якщо жоден ще не почав діяти.
+        function getFilterRecord(records) {
+            const list = normalizeRecords(records);
+            const idx = getActiveIndex(list, todayStr());
+            if (idx >= 0) return list[idx];
+            return list.find(s => s.p) || { p: '', l: 0, c: 0, m: '', from: '', t: '' };
+        }
+        // ==============================================================================
+
+        // Наперед підвантажуємо назви підприємств для підказки (datalist), щоб
+        // вона працювала одразу на вкладці «Мапінг ТЗ», навіть якщо вкладку
+        // «Автопарк» ще жодного разу не відкривали в цій сесії.
+        function prefetchFleetEntList() {
+            firebase.database().ref('fleet').once('value').then(snap => {
+                const fleet = snap.val() || {};
+                const dl = document.getElementById('fleet-ent-list');
+                if (dl && !dl.children.length) {
+                    dl.innerHTML = Object.keys(fleet).sort((a, b) => a.localeCompare(b, 'uk'))
+                        .map(e => `<option value="${escapeAttr(e)}">`).join('');
+                }
+            }).catch(() => {});
+        }
+
+        function checkPassword() {
+            const input = document.getElementById('password').value;
+            if (input === ADMIN_PASSWORD) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('admin-panel').style.display = 'block';
+                loadData();
+                prefetchFleetEntList();
+                return true;
+            } else {
+                alert("❌ Неправильний пароль!");
+                document.getElementById('password').value = '';
+                return false;
+            }
+        }
+
+        // Справжня подія submit форми (а не просто onclick по кнопці) потрібна,
+        // щоб браузер/Google Password Manager взагалі розпізнав це як форму
+        // логіну і запропонував зберегти пароль. preventDefault — щоб сторінка
+        // не перезавантажувалась (сам пароль перевіряється тут же, без сервера).
+        window.handleLoginSubmit = function(event) {
+            event.preventDefault();
+            checkPassword();
+            return false;
+        };
+
+        // ====================== ВКЛАДКИ ======================
+        let fleetLoadedOnce = false;
+        window.showTab = function(name) {
+            document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + name).classList.add('active');
+            document.getElementById('tabbtn-' + name).classList.add('active');
+            if (name === 'fleet' && !fleetLoadedOnce) {
+                fleetLoadedOnce = true;
+                loadFleetOverview();
+            }
+        };
+        // =======================================================
+
+        // Firebase інколи повертає весь об'єкт як МАСИВ, якщо всі ключі —
+        // числа (а ID трекерів саме такі: "1", "2", "160"...). Це змішує
+        // записи місцями. Приводимо назад до звичайного об'єкта за ID.
+        function normalizeTopLevel(val) {
+            if (!val) return {};
+            if (Array.isArray(val)) {
+                const obj = {};
+                val.forEach((v, i) => { if (v !== null && v !== undefined) obj[i] = v; });
+                return obj;
+            }
+            return val;
+        }
+
+        // Одометр і номер з API пише provider.py: odometer/{id} = {value, date, ts}
+        // (раз на тиждень) та tracker_plates/{id} = {plate, date}.
+        let ODO_DATA = {}, API_PLATES = {};
+        function odoHtml(id) {
+            const o = ODO_DATA[id], p = API_PLATES[id];
+            if (!o && !p) return '';
+            const val = o && o.value != null ? Number(o.value).toLocaleString('uk-UA', { maximumFractionDigits: 0 }) : '';
+            return `<div style="margin:6px 0 2px; font-size:0.85em; color:var(--text-muted);">
+                ${p ? `🔖 Номер з API: <b>${escapeAttr(p.plate || '')}</b><br>` : ''}
+                ${o ? `🛣️ Одометр: <b>${val}</b> (від ${escapeAttr(o.date || '')})` : ''}
+            </div>`;
+        }
+        function loadData() {
+            dbRef.on('value', (snapshot) => {
+                allData = normalizeTopLevel(snapshot.val());
+                invalidateOdoIndex();
+                applyFilters();
+            });
+            firebase.database().ref('odometer').on('value',
+                s => { ODO_DATA = s.val() || {}; ODO_ERR = ''; invalidateOdoIndex(); applyFilters(); },
+                e => { ODO_ERR = e.message || 'permission_denied'; applyFilters(); });
+            firebase.database().ref('tracker_plates').on('value',
+                s => { API_PLATES = s.val() || {}; invalidateOdoIndex(); applyFilters(); },
+                e => { PLATES_ERR = e.message || 'permission_denied'; applyFilters(); });
+        }
+        let ODO_ERR = '', PLATES_ERR = '';
+
+        // ---- Одометр у таблиці автопарку. Автопарк ключується номером (plate),
+        // а одометр пише provider.py по ID трекера — зв'язуємо їх через номер
+        // (з odometer/{id}.plate, tracker_plates та мапінгу vehicle_mapping).
+        const ODO_DIVISOR = 1;   // якщо трекер віддає метри, а треба км — постав 1000
+        let ODO_BY_PLATE = null;
+        function invalidateOdoIndex() { ODO_BY_PLATE = null; }
+        function fmtOdo(v) {
+            return Number(v / ODO_DIVISOR).toLocaleString('uk-UA', { maximumFractionDigits: 0 });
+        }
+        function buildOdoIndex() {
+            const idx = {};
+            const add = (plate, id) => {
+                const k = canonicalPlateKey(plate);
+                const o = ODO_DATA[id];
+                if (!k || !o || o.value == null) return;
+                if (!idx[k] || (o.ts || 0) > (idx[k].o.ts || 0)) idx[k] = { id, o };
+            };
+            Object.keys(ODO_DATA).forEach(id => {
+                const o = ODO_DATA[id];
+                if (!o) return;
+                if (o.plate) add(o.plate, id);
+                if (API_PLATES[id] && API_PLATES[id].plate) add(API_PLATES[id].plate, id);
+                if (allData && allData[id]) normalizeRecords(allData[id]).forEach(r => { if (r.p) add(r.p, id); });
+            });
+            return idx;
+        }
+        function odoForFleetKey(key, info) {
+            if (!ODO_BY_PLATE) ODO_BY_PLATE = buildOdoIndex();
+            return ODO_BY_PLATE[canonicalPlateKey(key)] || ODO_BY_PLATE[canonicalPlateKey(info && info.plate)] || null;
+        }
+        // Діагностична плашка: чи взагалі приходять дані одометра з Firebase.
+        function odoStatusChip() {
+            if (ODO_ERR || PLATES_ERR) {
+                return `<div class="stat-chip" style="border-color:#fca5a5; background:#fef2f2; color:#991b1b;">
+                    ⚠️ Немає доступу до ${ODO_ERR ? 'odometer' : ''}${ODO_ERR && PLATES_ERR ? ' і ' : ''}${PLATES_ERR ? 'tracker_plates' : ''}
+                    — додай ці вузли в Firebase Rules (".read": true)</div>`;
+            }
+            const n = Object.keys(ODO_DATA).length;
+            return `<div class="stat-chip">🛣️ <span class="stat-num">${n}</span> ТЗ з одометром${n ? '' : ' (сервер ще не записав — перезапусти provider.py)'}</div>`;
+        }
+
+        const CLIMATE_LABELS = {0:'без кондиціонера', 1:'вентиляція', 2:'малий кондиціонер', 3:'повний кондиціонер', 4:'невідомо'};
+
+        // ====================== ТИП ТРАНСПОРТУ (за назвою моделі) ======================
+        // Визначаємо автобус / тролейбус / трамвай / електробус за виробником і назвою
+        // моделі, щоб різнорідний парк (маршрутки, тролейбуси, трамваї...) можна було
+        // побачити і відфільтрувати одразу, навіть якщо просто імпортували купу даних.
+        function guessVehicleType(model) {
+            const m = (model || '').toLowerCase();
+            if (!m.trim()) return 'unknown';
+            if (/tatra|kt4/.test(m)) return 'tram';
+            if (/electric|електробус|електро\s*бус|e-?bus|yutong\s*e|byd/.test(m)) return 'electrobus';
+            if (/škoda|skoda|14tr|електрон\s*t\d|elektron\s*t\d|t19\d|t3l\d|лаз\s*e183|electrolaz/.test(m)) return 'trolleybus';
+            return 'bus';
+        }
+        const TYPE_LABELS = { bus: '🚌 Автобус', trolleybus: '🚎 Тролейбус', tram: '🚋 Трамвай', electrobus: '⚡ Електробус', unknown: '❔ Невідомо' };
+        const TYPE_BADGE_CLASS = { bus: 'badge-bus', trolleybus: 'badge-trolleybus', tram: 'badge-tram', electrobus: 'badge-electrobus', unknown: 'badge-unknown' };
+
+        // Тип ТЗ можна вказати вручну (поле t) — тоді він має пріоритет над
+        // автовизначенням за моделлю. Порожнє значення t = "визначати автоматично".
+        // Старі записи могли мати тип 'funicular' — показуємо їх як електробус.
+        function normType(t) { return t === 'funicular' ? 'electrobus' : t; }
+        function getVehicleType(rec) {
+            if (rec && rec.t) return normType(rec.t);
+            return guessVehicleType(rec && rec.m);
+        }
+
+        function renderMappingSummary() {
+            const box = document.getElementById('mapping-summary');
+            if (!box) return;
+            const counts = { bus: 0, trolleybus: 0, tram: 0, electrobus: 0, unknown: 0 };
+            Object.keys(allData).forEach(id => {
+                const fr = getFilterRecord(allData[id]);
+                counts[getVehicleType(fr)]++;
+            });
+            const total = Object.keys(allData).length;
+            box.innerHTML = `
+                <div class="stat-chip"><span class="stat-num">${total}</span> всього ТЗ</div>
+                ${odoStatusChip()}
+                <div class="stat-chip type-bus"><span class="stat-num">${counts.bus}</span> 🚌 автобусів</div>
+                <div class="stat-chip type-trolley"><span class="stat-num">${counts.trolleybus}</span> 🚎 тролейбусів</div>
+                <div class="stat-chip type-tram"><span class="stat-num">${counts.tram}</span> 🚋 трамваїв</div>
+                ${counts.electrobus ? `<div class="stat-chip type-electrobus"><span class="stat-num">${counts.electrobus}</span> ⚡ електробус</div>` : ''}
+                ${counts.unknown ? `<div class="stat-chip type-unknown"><span class="stat-num">${counts.unknown}</span> ❔ без моделі</div>` : ''}
+            `;
+        }
+
+        // ====================== МАСОВИЙ ІМПОРТ ЗІ СТАРОГО ФОРМАТУ JSON ======================
+        window.handleImportFile = function(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => { document.getElementById('import_json').value = e.target.result; };
+            reader.onerror = () => alert('Не вдалося прочитати файл');
+            reader.readAsText(file, 'UTF-8');
+        };
+
+        window.runImport = function() {
+            const raw = document.getElementById('import_json').value.trim();
+            if (!raw) return alert('Встав JSON або обери файл!');
+
+            let data;
+            try { data = JSON.parse(raw); } catch (e) { return alert('Некоректний JSON: ' + e.message); }
+
+            const ids = Object.keys(data || {});
+            if (!ids.length) return alert('Порожні дані.');
+
+            const overwrite = document.getElementById('import_overwrite').checked;
+            if (!confirm(`Знайдено ${ids.length} записів у файлі.\n${overwrite ? 'Записи з ID, що вже є, будуть ПЕРЕЗАПИСАНІ.' : 'Записи з ID, що вже є, будуть пропущені.'}\nПродовжити?`)) return;
+
+            const updates = {};
+            let added = 0, skipped = 0, invalid = 0;
+
+            ids.forEach(id => {
+                const rec = data[id];
+                if (!Array.isArray(rec) || rec.length < 1 || typeof rec[0] !== 'string' || !rec[0].trim()) { invalid++; return; }
+                if (!overwrite && allData[id]) { skipped++; return; }
+                updates['vehicle_mapping/' + id] = [{
+                    p: rec[0].trim(),
+                    l: parseInt(rec[1]) || 0,
+                    c: parseInt(rec[2]) || 0,
+                    m: (typeof rec[3] === 'string') ? rec[3].trim() : '',
+                    from: ''
+                }];
+                added++;
+            });
+
+            if (!added) { alert(`Нічого імпортувати.\nПропущено (вже є): ${skipped}\nНекоректних: ${invalid}`); return; }
+
+            firebase.database().ref().update(updates)
+                .then(() => {
+                    alert(`✅ Імпортовано: ${added}\nПропущено (вже є): ${skipped}\nНекоректних: ${invalid}`);
+                    document.getElementById('import_json').value = '';
+                    document.getElementById('import_file').value = '';
+                })
+                .catch(e => alert('Помилка: ' + e.message));
+        };
+
+        function cardHtml(id, records) {
+            const list = normalizeRecords(records);
+            const idx = getActiveIndex(list, todayStr());
+            const cur = idx >= 0 ? list[idx] : { p: '', l: 0, c: 0, m: '', from: '', t: '', y: '', ls: '' };
+            const vType = getVehicleType(cur);
+            const history = list.map((s, i) => Object.assign({}, s, { _i: i })).filter(s => s._i !== idx && s.p)
+                .sort((a, b) => (b.from || '').localeCompare(a.from || ''));
+
+            const historyHtml = history.length ? `
+                <details style="margin-top:8px;">
+                    <summary style="cursor:pointer; color:#3498db; font-size:0.9em; font-weight:bold;">📜 Історія (${history.length})</summary>
+                    <div style="font-size:0.85em; color:#666;">
+                        ${history.map(h => `
+                            <div style="padding:5px 0; border-top:1px solid #eee;">
+                                <b>${h.p}</b>${h.m ? ' · ' + h.m : ''}${h.y ? ' · ' + h.y : ''}<br>${h.from ? 'з ' + h.from : 'дата не вказана'}
+                                <button class="btn-rename" style="padding:3px 8px" onclick="editHistory('${id}',${h._i})">✏️</button><button class="btn-delete" style="padding:3px 8px" onclick="deleteHistory('${id}',${h._i})">🗑️</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </details>` : '';
+
+            return `
+                <div class="card" id="card_${id}">
+                    <b>ID: ${id}</b><span class="type-badge ${TYPE_BADGE_CLASS[vType]}">${TYPE_LABELS[vType]}</span>
+                    ${odoHtml(id)}
+                    <label>Номер</label><textarea autocomplete="off" id="p_${id}" class="resizable-field" rows="1">${escapeAttr(cur.p || '')}</textarea>
+                    <label>Діє з (дата, необов'язково)</label><input autocomplete="off" type="text" class="date-field dt" value="${escapeAttr(cur.from || '')}" id="from_${id}" placeholder="РРРР-ММ-ДД ГГ:ХХ">
+                    <label>Низька підлога</label>
+                    <select id="l_${id}">
+                        <option value="0" ${cur.l==0?'selected':''}>0 — Ні</option>
+                        <option value="1" ${cur.l==1?'selected':''}>1 — Так</option>
+                    </select>
+                    <label>Кондиціонер</label>
+                    <select id="c_${id}">
+                        <option value="0" ${cur.c==0?'selected':''}>0 — Без</option>
+                        <option value="1" ${cur.c==1?'selected':''}>1 — Вентиляція</option>
+                        <option value="2" ${cur.c==2?'selected':''}>2 — Малий</option>
+                        <option value="3" ${cur.c==3?'selected':''}>3 — Повний</option>
+                        <option value="4" ${cur.c==4?'selected':''}>4 — Невідомо</option>
+                    </select>
+                    <label>Модель</label><textarea autocomplete="off" id="m_${id}" class="resizable-field" rows="1">${escapeAttr(cur.m || '')}</textarea>
+                    <label>Рік випуску</label><textarea autocomplete="off" id="y_${id}" class="resizable-field" rows="1">${escapeAttr(cur.y || '')}</textarea>
+                    <label>Дата виходу на лінію (перший раз)</label><input autocomplete="off" type="text" class="date-field" value="${escapeAttr(cur.ls || '')}" id="ls_${id}" placeholder="РРРР-ММ-ДД">
+                    <label>Тип ТЗ</label>
+                    <select id="t_${id}">
+                        <option value="">Авто (за моделлю): ${TYPE_LABELS[guessVehicleType(cur.m)]}</option>
+                        <option value="bus" ${cur.t==='bus'?'selected':''}>🚌 Автобус</option>
+                        <option value="trolleybus" ${cur.t==='trolleybus'?'selected':''}>🚎 Тролейбус</option>
+                        <option value="tram" ${cur.t==='tram'?'selected':''}>🚋 Трамвай</option>
+                        <option value="electrobus" ${normType(cur.t)==='electrobus'?'selected':''}>⚡ Електробус</option>
+                    </select>
+
+                    <div id="replace_form_${id}" style="display:none; margin-top:10px; padding:10px; border:1px solid #3498db; border-radius:6px; background:#f4faff;">
+                        <div style="font-weight:bold; margin-bottom:4px;">🔄 Новий борт на цьому трекері</div>
+                        <label>Новий номер</label><textarea autocomplete="off" id="np_${id}" class="resizable-field" rows="1"></textarea>
+                        <label>Діє з (дата)</label><input autocomplete="off" type="text" class="date-field dt" id="nfrom_${id}" value="${nowStr()}" placeholder="РРРР-ММ-ДД ГГ:ХХ">
+                        <label>Низька підлога</label>
+                        <select id="nl_${id}"><option value="0">0 — Ні</option><option value="1">1 — Так</option></select>
+                        <label>Кондиціонер</label>
+                        <select id="nc_${id}">
+                            <option value="0">0 — Без</option><option value="1">1 — Вентиляція</option>
+                            <option value="2">2 — Малий</option><option value="3">3 — Повний</option>
+                            <option value="4">4 — Невідомо</option>
+                        </select>
+                        <label>Модель</label><textarea autocomplete="off" id="nm_${id}" class="resizable-field" rows="1"></textarea>
+                        <label>Рік випуску</label><textarea autocomplete="off" id="ny_${id}" class="resizable-field" rows="1"></textarea>
+                        <label>Дата виходу на лінію (перший раз)</label><input autocomplete="off" type="text" class="date-field" id="nls_${id}" placeholder="РРРР-ММ-ДД">
+                        <label>Тип ТЗ</label>
+                        <select id="nt_${id}">
+                            <option value="">Авто (за моделлю)</option>
+                            <option value="bus">🚌 Автобус</option>
+                            <option value="trolleybus">🚎 Тролейбус</option>
+                            <option value="tram">🚋 Трамвай</option>
+                            <option value="electrobus">⚡ Електробус</option>
+                        </select>
+                        <div style="margin-top:6px;">
+                            <button class="btn-save" onclick="confirmReplace('${id}')">✅ Підтвердити заміну</button>
+                            <button onclick="document.getElementById('replace_form_${id}').style.display='none'">Скасувати</button>
+                        </div>
+                    </div>
+
+                    ${historyHtml}
+
+                    <div style="margin-top:8px;">
+                        <button class="btn-save" onclick="saveCurrent('${id}')">💾 Зберегти</button>
+                        <button class="btn-rename" onclick="document.getElementById('replace_form_${id}').style.display='block'">🔄 Замінити ТЗ</button>
+                        <button class="btn-rename" onclick="renameVehicle('${id}')">✏️ Змінити ID</button>
+                        <button class="btn-delete" onclick="deleteVehicle('${id}')">🗑️ Видалити</button>
+                    </div>
+                </div>`;
+        }
+
+        function renderList(data) {
+            const list = document.getElementById('list');
+            if (Object.keys(data).length === 0) {
+                list.innerHTML = '<p style="color:#777; text-align:center; padding:30px;">Нічого не знайдено</p>';
+                return;
+            }
+            list.innerHTML = Object.keys(data).map(id => cardHtml(id, data[id])).join('');
+        }
+
+        window.saveCurrent = function(id) {
+            const list = normalizeRecords(allData[id]);
+            const idx = getActiveIndex(list, todayStr());
+            const fromEl = document.getElementById('from_'+id);
+            normalizeDateField(fromEl);
+            const lsEl = document.getElementById('ls_'+id);
+            normalizeDateField(lsEl);
+            const rec = {
+                p: document.getElementById('p_'+id).value.trim(),
+                from: fromEl.value || '',
+                l: parseInt(document.getElementById('l_'+id).value),
+                c: parseInt(document.getElementById('c_'+id).value),
+                m: document.getElementById('m_'+id).value.trim(),
+                t: document.getElementById('t_'+id).value || '',
+                y: document.getElementById('y_'+id).value.trim(),
+                ls: lsEl.value || ''
+            };
+            if (idx >= 0) list[idx] = rec; else list.push(rec);
+            firebase.database().ref('vehicle_mapping/' + id).set(list)
+                .then(() => alert('✅ Збережено!'))
+                .catch(e => alert('Помилка: ' + e.message));
+        };
+
+        // ---- Пошук борту в автопарку за ключем номера (без прив'язки до
+        // конкретного підприємства — треба перебрати всі, бо ми заздалегідь
+        // не знаємо, в якому підприємстві він числиться). ----
+        async function findFleetEntryByKey(key) {
+            if (!key) return null;
+            const snap = await firebase.database().ref('fleet').once('value');
+            const fleet = snap.val() || {};
+            for (const ent of Object.keys(fleet)) {
+                if (fleet[ent] && Object.prototype.hasOwnProperty.call(fleet[ent], key)) {
+                    return { ent, info: fleet[ent][key] || {} };
+                }
+            }
+            return null;
+        }
+
+        // ---- Переносить картку автопарку на новий борт при заміні ТЗ в мапінгу.
+        // Раніше «Замінити ТЗ» міняв лише vehicle_mapping, а автопарк лишався
+        // зі СТАРИМ номером/моделлю (тому й виникало враження, що «номер старий,
+        // а модель змінилась» — модель могли поправити вручну в таблиці
+        // автопарку, а номер там же забути змінити). Тепер це робиться
+        // автоматично і атомарно: підприємство/рік/дату виходу на лінію/примітку
+        // зберігаємо, а номер+модель+тип переносимо на нові. Якщо старого борту
+        // в автопарку взагалі не було — нічого не займаємо (додати новий можна
+        // вручну на вкладці «Автопарк»). ----
+        async function migrateFleetOnReplace(oldPlate, newPlate, newModel, newVType, newYear, newLineStart) {
+            const oldKey = canonicalPlateKey(oldPlate);
+            const newKey = canonicalPlateKey(newPlate);
+            if (!newKey) return false;
+            const found = await findFleetEntryByKey(oldKey);
+            if (!found) return false;
+            const { ent, info } = found;
+            const updates = {};
+            if (oldKey !== newKey) updates[`fleet/${ent}/${oldKey}`] = null;
+            updates[`fleet/${ent}/${newKey}`] = {
+                enterprise_name: ent,
+                plate: newPlate,
+                model: newModel || '',
+                vtype: newVType || '',
+                year: newYear || info.year || '',
+                line_start: newLineStart || info.line_start || '',
+                excel_status: info.excel_status || '',
+                note: info.note || '',
+                fleet_no: info.fleet_no != null ? info.fleet_no : null
+            };
+            await firebase.database().ref().update(updates);
+            return true;
+        }
+
+        window.confirmReplace = async function(id) {
+            const p = document.getElementById('np_'+id).value.trim();
+            if (!p) return alert('Вкажіть номер нового борту!');
+            const list = normalizeRecords(allData[id]);
+            const prevIdx = getActiveIndex(list, todayStr());
+            const oldPlate = prevIdx >= 0 ? list[prevIdx].p : '';
+            const newModel = document.getElementById('nm_'+id).value.trim();
+            const newVType = document.getElementById('nt_'+id).value || '';
+            const newYear = document.getElementById('ny_'+id).value.trim();
+            const nlsEl = document.getElementById('nls_'+id);
+            normalizeDateField(nlsEl);
+            const newLineStart = nlsEl.value || '';
+            const nfromEl = document.getElementById('nfrom_'+id);
+            normalizeDateField(nfromEl);
+            list.push({
+                p: p,
+                from: nfromEl.value || nowStr(),
+                l: parseInt(document.getElementById('nl_'+id).value),
+                c: parseInt(document.getElementById('nc_'+id).value),
+                m: newModel,
+                t: newVType,
+                y: newYear,
+                ls: newLineStart
+            });
+            try {
+                if (!(await saveMappingChecked({ [id]: list }))) return;
+                const moved = (oldPlate && !confirm('Перенести картку автопарку зі старого номера «' + oldPlate + '» на новий?\n\nОК — це заміна/виправлення номера на тому ж борту.\nСкасувати — старий борт лишається в парку (наприклад, його трекер просто дали іншому борту).')) ? false : await migrateFleetOnReplace(oldPlate, p, newModel, newVType, newYear, newLineStart);
+                alert('✅ Новий борт закріплено, старий переїхав в історію' +
+                    (moved ? '\n🚌 Автопарк теж оновлено (номер + модель перенесені)' :
+                        '\nℹ️ У автопарку такого номера не знайдено — картку автопарку (за потреби) онови вручну на вкладці «Автопарк».'));
+            } catch (e) {
+                alert('Помилка: ' + e.message);
+            }
+        };
+
+        window.addNewVehicle = function() {
+            const id = document.getElementById('new_id').value.trim();
+            if (!id) return alert("Введіть ID ТЗ!");
+
+            const ent = document.getElementById('new_ent').value.trim();
+            const plate = document.getElementById('new_p').value.trim();
+            const model = document.getElementById('new_m').value.trim();
+            const vtype = document.getElementById('new_t').value || '';
+            const year = document.getElementById('new_y').value.trim();
+            const lsEl = document.getElementById('new_ls');
+            normalizeDateField(lsEl);
+            const lineStart = lsEl.value || '';
+
+            const newData = [{
+                p: plate,
+                from: '',
+                l: parseInt(document.getElementById('new_l').value),
+                c: parseInt(document.getElementById('new_c').value),
+                m: model,
+                t: vtype,
+                y: year,
+                ls: lineStart
+            }];
+
+            const updates = {};
+            updates['vehicle_mapping/' + id] = newData;
+
+            // Якщо вказане підприємство — одразу заводимо борт і в автопарку,
+            // щоб не треба було ще раз вручну дублювати його на вкладці
+            // «Автопарк» або чекати на «Синхронізувати з мапінгом».
+            let fleetKey = null;
+            if (ent && plate) {
+                fleetKey = canonicalPlateKey(plate);
+                if (fleetKey) {
+                    updates[`fleet/${ent}/${fleetKey}`] = {
+                        enterprise_name: ent,
+                        plate: plate,
+                        model: model,
+                        vtype: vtype,
+                        year: year,
+                        line_start: lineStart,
+                        note: `Автододано через Мапінг ТЗ (ID ${id})`,
+                        fleet_no: null
+                    };
+                }
+            }
+
+            firebase.database().ref().update(updates)
+                .then(() => {
+                    let msg = `✅ ТЗ ${id} додано!`;
+                    if (fleetKey) msg += `\n🚌 Додано в автопарк «${ent}»`;
+                    else if (plate && !ent) msg += `\nℹ️ Підприємство не вказане — в автопарк НЕ додано (можна додати вручну на вкладці «Автопарк»).`;
+                    alert(msg);
+                    document.getElementById('new_id').value = '';
+                    document.getElementById('new_ent').value = '';
+                    document.getElementById('new_p').value = '';
+                    document.getElementById('new_m').value = '';
+                    document.getElementById('new_y').value = '';
+                    document.getElementById('new_ls').value = '';
+                })
+                .catch(e => alert('Помилка: ' + e.message));
+        };
+
+        // ====================== ІСТОРІЯ: ПЕРЕВІРКА НАКЛАДАНЬ, ПРАВКА, ПЕРЕСТАНОВКА ======================
+        function plateIntervals(data) {
+            const out = [];
+            Object.keys(data).forEach(id => {
+                const l = normalizeRecords(data[id]).filter(r => r.p).map(r => ({ p: canonicalPlateKey(r.p), f: fk(r.from) }))
+                    .sort((a, b) => a.f.localeCompare(b.f));
+                l.forEach((r, k) => { const e = k + 1 < l.length ? l[k + 1].f : '9999'; if (r.f < e) out.push({ id, p: r.p, f: r.f, e }); });
+            });
+            return out;
+        }
+        // Один і той самий борт не може одночасно стояти на двох трекерах.
+        function findConflicts(data) {
+            const by = {}, res = [];
+            plateIntervals(data).forEach(x => (by[x.p] = by[x.p] || []).push(x));
+            Object.keys(by).forEach(p => { const a = by[p];
+                for (let i = 0; i < a.length; i++) for (let j = i + 1; j < a.length; j++)
+                    if (a[i].id !== a[j].id && a[i].f < a[j].e && a[j].f < a[i].e)
+                        res.push(`${p}: трекер ${a[i].id} (з ${a[i].f || 'початку'}) і ${a[j].id} (з ${a[j].f || 'початку'})`);
+            });
+            return res;
+        }
+        // Зберігає зміни кількох трекерів одним запитом; питає, лише якщо з'явились НОВІ накладання.
+        async function saveMappingChecked(changes) {
+            const nd = Object.assign({}, allData);
+            Object.keys(changes).forEach(k => nd[k] = changes[k]);
+            const old = new Set(findConflicts(allData));
+            const add = findConflicts(nd).filter(x => !old.has(x));
+            if (add.length && !confirm('⚠️ Накладання (борт одночасно на двох трекерах):\n' + add.slice(0, 8).join('\n') + '\n\nЗберегти все одно?')) return false;
+            const u = {};
+            Object.keys(changes).forEach(k => u['vehicle_mapping/' + k] = changes[k]);
+            await firebase.database().ref().update(u);
+            await firebase.database().ref('control/mapping_reload').set(Date.now());
+            return true;
+        }
+        window.editHistory = async function(id, i) {
+            const list = normalizeRecords(allData[id]), r = list[i];
+            if (!r) return;
+            const p = prompt('Номер борту:', r.p); if (p === null) return;
+            const f = prompt('Діє з (РРРР-ММ-ДД або РРРР-ММ-ДД ГГ:ХХ; порожньо = завжди):', r.from || ''); if (f === null) return;
+            const t = document.createElement('input'); t.className = 'date-field dt'; t.value = f; normalizeDateField(t);
+            r.p = p.trim(); r.from = t.value;
+            try { await saveMappingChecked({ [id]: list }); } catch (e) { alert('Помилка: ' + e.message); }
+        };
+        window.deleteHistory = async function(id, i) {
+            if (!confirm('Видалити цей запис історії?')) return;
+            const list = normalizeRecords(allData[id]); list.splice(i, 1);
+            try { await saveMappingChecked({ [id]: list }); } catch (e) { alert('Помилка: ' + e.message); }
+        };
+        // Властивості (низька підлога, кондиціонер, модель, рік...) належать БОРТУ, а не трекеру —
+        // при перестановці беремо їх із останнього запису цього номера на будь-якому трекері.
+        function findBusProps(plate) {
+            const key = canonicalPlateKey(plate); let best = null;
+            Object.keys(allData).forEach(id => normalizeRecords(allData[id]).forEach(r => {
+                if (r.p && canonicalPlateKey(r.p) === key && (!best || fk(r.from) >= fk(best.from))) best = r;
+            }));
+            return best ? { l: best.l, c: best.c, m: best.m, t: best.t, y: best.y, ls: best.ls } : { l: 0, c: 4, m: '', t: '', y: '', ls: '' };
+        }
+        // Рядки «ID_трекера номер_борту»; усе застосовується одним записом з перевіркою накладань.
+        window.applySwap = async function() {
+            const f = document.getElementById('swap_from'); normalizeDateField(f);
+            const when = f.value || nowStr();
+            const lines = document.getElementById('swap_text').value.split('\n').map(s => s.trim()).filter(Boolean);
+            if (!lines.length) return alert('Впиши рядки: ID_трекера номер_борту');
+            const changes = {}, preview = [];
+            for (const ln of lines) {
+                const m = ln.match(/^(\S+?)[\s,;:=\t]+(.+)$/);
+                if (!m) return alert('Не розпізнано рядок: ' + ln);
+                const id = m[1], p = m[2].trim();
+                const list = normalizeRecords(changes[id] || allData[id]);
+                const cur = getActiveIndex(list, when);
+                if (cur >= 0 && canonicalPlateKey(list[cur].p) === canonicalPlateKey(p)) continue;
+                preview.push(`${id}: ${cur >= 0 ? list[cur].p : (allData[id] ? '—' : 'новий трекер')} → ${p}`);
+                list.push(Object.assign({ p, from: when }, findBusProps(p)));
+                changes[id] = list;
+            }
+            if (!preview.length) return alert('Нічого міняти — усі номери вже такі.');
+            if (!confirm('З ' + when + ':\n' + preview.join('\n') + '\n\nЗастосувати?')) return;
+            try { if (await saveMappingChecked(changes)) { alert('✅ Перестановку збережено'); document.getElementById('swap_text').value = ''; } }
+            catch (e) { alert('Помилка: ' + e.message); }
+        };
+        document.addEventListener('DOMContentLoaded', () => { const f = document.getElementById('swap_from'); if (f) f.value = nowStr(); });
+
+        window.deleteVehicle = function(id) {
+            if (!confirm(`Видалити ТЗ ${id}?`)) return;
+            firebase.database().ref('vehicle_mapping/' + id).remove()
+                .then(() => {
+                    alert(`🗑️ ${id} видалено`);
+                    delete allData[id];
+                    applyFilters();
+                })
+                .catch(e => alert('Помилка: ' + e.message));
+        };
+
+        window.renameVehicle = function(oldId) {
+            const newId = prompt(`Новий ID для ${oldId}:`, oldId);
+            if (!newId || newId === oldId) return;
+            const data = allData[oldId];
+            firebase.database().ref('vehicle_mapping/' + newId).set(data)
+                .then(() => firebase.database().ref('vehicle_mapping/' + oldId).remove())
+                .then(() => {
+                    alert(`✅ ID змінено`);
+                    delete allData[oldId];
+                    applyFilters();
+                })
+                .catch(e => alert('Помилка: ' + e.message));
+        };
+
+        // Сигнал серверу (provider.py): "перечитай vehicle_mapping просто зараз".
+        // Пишемо лише мітку часу в крихітний вузол control/mapping_reload.
+        window.applyMappingOnServer = async function() {
+            const statusEl = document.getElementById('apply-status');
+            try {
+                await firebase.database().ref('control/mapping_reload').set(Date.now());
+                statusEl.style.color = '#2e7d32';
+                statusEl.textContent = '✅ Сигнал надіслано о ' + new Date().toLocaleTimeString('uk-UA') +
+                    ' — сервер підхопить зміни протягом ~30 секунд';
+            } catch (e) {
+                statusEl.style.color = '#c62828';
+                statusEl.textContent = '❌ Не вдалося надіслати сигнал';
+                alert('Помилка: ' + e.message + '\n\nЙмовірно, у Firebase Rules немає дозволу на запис у вузол control.');
+            }
+        };
+
+        window.clearCacheAndRefresh = function() {
+            if (confirm("Оновити дані з Firebase?")) {
+                dbRef.once('value').then(snapshot => {
+                    allData = normalizeTopLevel(snapshot.val());
+                    applyFilters();
+                    alert("✅ Дані оновлено");
+                });
+            }
+        };
+
+        window.applyFilters = function() {
+            const term = document.getElementById('search').value.toLowerCase().trim();
+            const climateFilter = document.getElementById('filter-climate').value;
+            const modelFilter = document.getElementById('filter-model').value;
+            const typeFilter = document.getElementById('filter-type').value;
+            const sortBy = document.getElementById('sort-by').value;
+
+            renderMappingSummary();
+
+            let filtered = {};
+
+            for (let id in allData) {
+                const v = allData[id] || [];
+                const fr = getFilterRecord(v); // запис, що діє "сьогодні" (або перший заповнений)
+                const climate = parseInt(fr.c) || 0;
+                const model = (fr.m || '').toString().trim();
+
+                // пошук — по всій історії номерів/моделей цього ID, щоб знаходились і старі борти
+                const allRecs = normalizeRecords(v);
+                const matchesTerm = !term ||
+                    id.toLowerCase().includes(term) ||
+                    allRecs.some(s => String(s.p||'').toLowerCase().includes(term) || String(s.m||'').toLowerCase().includes(term));
+                if (!matchesTerm) continue;
+
+                if (climateFilter && climate.toString() !== climateFilter) continue;
+                if (modelFilter === 'empty' && model !== '') continue;
+                if (typeFilter && getVehicleType(fr) !== typeFilter) continue;
+
+                filtered[id] = allData[id];
+            }
+
+            // Сортування (за записом, що діє сьогодні)
+            const sortedKeys = Object.keys(filtered).sort((a, b) => {
+                const fa = getFilterRecord(filtered[a]);
+                const fb = getFilterRecord(filtered[b]);
+                if (sortBy === 'model') return String(fa.m||'').localeCompare(String(fb.m||''));
+                if (sortBy === 'climate') return (fa.c||0) - (fb.c||0);
+                if (sortBy === 'lowfloor') return (fa.l||0) - (fb.l||0);
+                if (sortBy === 'odometer') return ((ODO_DATA[b] && ODO_DATA[b].value) || 0) - ((ODO_DATA[a] && ODO_DATA[a].value) || 0);
+                return a.localeCompare(b); // за ID
+            });
+
+            const sortedData = {};
+            sortedKeys.forEach(key => sortedData[key] = filtered[key]);
+            renderList(sortedData);
+        };
+
+        // ====================== АВТОПАРК (fleet + last_seen) ======================
+        // Пороги простою — ті самі, що й у provider.py (IDLE_SHORT_DAYS / IDLE_LONG_DAYS).
+        const IDLE_SHORT_DAYS = 3;   // від стількох днів без виходу — жовтий
+        const IDLE_LONG_DAYS = 10;   // від стількох днів без виходу — червоний
+
+        let FLEET_DATA = {};      // кеш останнього завантаження fleet
+        let FLEET_LAST_SEEN = {}; // кеш останнього завантаження last_seen
+        window.FLEET_ROW_MAP = {};     // rowId -> {ent, key}  (для кнопок Зберегти/Видалити в таблиці)
+        window.FLEET_ADD_ROW_MAP = {}; // addRowId -> ent      (для рядків додавання в кінці таблиці)
+        window.FLEET_ENT_MAP = {};     // entId -> реальна назва підприємства (для кнопок ✏️/🗑️ біля заголовка)
+
+        function escapeAttr(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // Українські держ. номери використовують лише літери, які однаково
+        // виглядають і кирилицею, і латиницею (А/A, В/B, С/C, Е/E, Н/H, І/I,
+        // К/K, М/M, О/O, Р/P, Т/T, Х/X). Якщо номер введений кирилицею, а
+        // трекер віддає його латиницею (або навпаки) — виходять РІЗНІ ключі
+        // Firebase для того самого борту, і система показує "не бачили в
+        // треку", хоча борт реально на маршруті. Ця функція завжди зводить
+        // такі літери до одного варіанту (латиниці), щоб ключ був однаковим
+        // незалежно від розкладки, якою його ввели.
+        const PLATE_HOMOGLYPHS = {
+            'А':'A','В':'B','С':'C','Е':'E','Н':'H','І':'I','К':'K',
+            'М':'M','О':'O','Р':'P','Т':'T','Х':'X','У':'Y'
+        };
+        function canonicalPlateKey(plate) {
+            let s = (plate || '').toUpperCase();
+            s = s.split('').map(ch => PLATE_HOMOGLYPHS[ch] || ch).join('');
+            return s.replace(/[^A-Z0-9]/g, '');
+        }
+
+        // Тип ТЗ для автопарку: вручну обране (vtype) має пріоритет,
+        // інакше визначаємо за назвою моделі (як і в мапінгу).
+        function getFleetType(info) {
+            if (info && info.vtype) return normType(info.vtype);
+            return guessVehicleType(info && info.model);
+        }
+
+        function daysSince(dateStr) {
+            if (!dateStr) return null;
+            const seen = new Date(dateStr + 'T00:00:00');
+            const today = new Date(todayStr() + 'T00:00:00');
+            return Math.round((today - seen) / 86400000);
+        }
+
+        window.loadFleetOverview = async function() {
+            const out = document.getElementById('fleet-output');
+            out.innerHTML = "<p>Завантажуємо стан автопарку...</p>";
+
+            let fleetSnap, seenSnap;
+            try {
+                [fleetSnap, seenSnap] = await Promise.all([
+                    firebase.database().ref('fleet').once('value'),
+                    firebase.database().ref('last_seen').once('value')
+                ]);
+            } catch (e) {
+                out.innerHTML = `<p style="color:red;">❌ Не вдалося прочитати дані автопарку: ${e.message}</p>
+                    <p style="color:#777;">Найімовірніше, у Firebase Rules немає дозволу на читання вузлів
+                    <code>fleet</code> і <code>last_seen</code>.</p>`;
+                console.error('Fleet load error:', e);
+                return;
+            }
+            FLEET_DATA = fleetSnap.val() || {};
+            FLEET_LAST_SEEN = seenSnap.val() || {};
+
+            // наповнюємо підказку підприємств у формі додавання та фільтр
+            const entListSorted = Object.keys(FLEET_DATA).sort((a, b) => a.localeCompare(b, 'uk'));
+            const dl = document.getElementById('fleet-ent-list');
+            dl.innerHTML = entListSorted.map(e => `<option value="${e}">`).join('');
+
+            const entFilterSel = document.getElementById('fleet-filter-ent');
+            if (entFilterSel) {
+                const prevVal = entFilterSel.value;
+                entFilterSel.innerHTML = '<option value="">Всі підприємства</option>' +
+                    entListSorted.map(e => `<option value="${escapeAttr(e)}">${e} (${Object.keys(FLEET_DATA[e] || {}).length})</option>`).join('');
+                if (entListSorted.includes(prevVal)) entFilterSel.value = prevVal;
+            }
+
+            renderFleetOverview();
+        };
+
+
+        // ====================== ОДОМЕТР: клітинка + графік ======================
+        function odoCellHtml(key, info) {
+            const f = odoForFleetKey(key, info);
+            if (!f) return '<span style="color:#aaa;">—</span>';
+            const title = (info && info.plate) || key;
+            return `<button type="button" class="odo-btn" onclick="openOdoChart('${escapeAttr(f.id)}', '${escapeAttr(title)}')" title="Відкрити графік одометра">
+                    📈 <b>${fmtOdo(f.o.value)}</b></button>
+                <div class="odo-date">від ${escapeAttr(f.o.date || '')}</div>`;
+        }
+
+        let ODO_CHART = { pts: [], mode: 'value', title: '' };
+        function ensureOdoModal() {
+            let m = document.getElementById('odo-modal');
+            if (m) return m;
+            m = document.createElement('div');
+            m.id = 'odo-modal';
+            m.innerHTML = `<div class="odo-dialog" role="dialog" aria-modal="true">
+                <div class="odo-head">
+                    <h4 class="odo-title"></h4>
+                    <button type="button" class="odo-close" onclick="closeOdoChart()" aria-label="Закрити">✕</button>
+                </div>
+                <div class="odo-tabs">
+                    <button type="button" data-mode="value" onclick="setOdoMode('value')">Показання одометра</button>
+                    <button type="button" data-mode="delta" onclick="setOdoMode('delta')">Приріст між оновленнями</button>
+                </div>
+                <div class="odo-body"></div>
+            </div>`;
+            m.addEventListener('click', e => { if (e.target === m) closeOdoChart(); });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOdoChart(); });
+            document.body.appendChild(m);
+            return m;
+        }
+        window.closeOdoChart = function() {
+            const m = document.getElementById('odo-modal');
+            if (m) m.style.display = 'none';
+        };
+        window.openOdoChart = async function(id, title) {
+            const m = ensureOdoModal();
+            m.querySelector('.odo-title').textContent = `🛣️ ${title} · ID ${id}`;
+            const body = m.querySelector('.odo-body');
+            body.innerHTML = '<p style="color:#777;">Завантаження...</p>';
+            m.style.display = 'flex';
+            let hist = {};
+            try {
+                hist = (await firebase.database().ref('odometer_history/' + id).once('value')).val() || {};
+            } catch (e) {
+                body.innerHTML = `<p style="color:#b91c1c;">❌ Немає доступу до <code>odometer_history</code>: ${escapeAttr(e.message)}.<br>Додай цей вузол у Firebase Rules (".read": true).</p>`;
+                return;
+            }
+            const cur = ODO_DATA[id];
+            if (cur && cur.date && cur.value != null && hist[cur.date] == null) hist[cur.date] = cur.value;
+            const pts = Object.keys(hist).sort().map(d => ({ date: d, v: Number(hist[d]) })).filter(p => isFinite(p.v));
+            pts.forEach((p, i) => {
+                p.delta = i ? p.v - pts[i - 1].v : null;
+                p.days = i ? Math.round((new Date(p.date + 'T00:00:00') - new Date(pts[i - 1].date + 'T00:00:00')) / 86400000) : null;
+            });
+            ODO_CHART = { pts, mode: 'value', title };
+            renderOdoChart();
+        };
+        window.setOdoMode = function(mode) { ODO_CHART.mode = mode; renderOdoChart(); };
+
+        function renderOdoChart() {
+            const m = document.getElementById('odo-modal');
+            const body = m.querySelector('.odo-body');
+            m.querySelectorAll('.odo-tabs button').forEach(b => b.classList.toggle('active', b.dataset.mode === ODO_CHART.mode));
+            const pts = ODO_CHART.pts, mode = ODO_CHART.mode;
+            if (!pts.length) { body.innerHTML = '<p style="color:#777;">Історії одометра ще немає.</p>'; return; }
+            if (mode === 'delta' && pts.length < 2) {
+                body.innerHTML = '<p style="color:#777;">Для приросту потрібно щонайменше два оновлення (збір раз на тиждень). Поки є лише одне: ' +
+                    `${pts[0].date} — <b>${fmtOdo(pts[0].v)}</b>.</p>`;
+                return;
+            }
+            const W = 720, H = 300, ml = 76, mr = 18, mt = 16, mb = 38;
+            const iw = W - ml - mr, ih = H - mt - mb;
+            const series = mode === 'value' ? pts : pts.slice(1);
+            const vals = series.map(p => (mode === 'value' ? p.v : p.delta) / ODO_DIVISOR);
+            let lo = mode === 'value' ? Math.min(...vals) : Math.min(0, ...vals);
+            let hi = Math.max(...vals);
+            if (hi === lo) { hi += 1; lo = mode === 'value' ? lo - 1 : lo; }
+            if (mode === 'value') { const pad = (hi - lo) * 0.08; lo -= pad; hi += pad; }
+            const n = series.length;
+            const xAt = i => n === 1 ? ml + iw / 2 : ml + (iw * i) / (n - 1);
+            const band = iw / n;
+            const xBar = i => ml + band * i + band / 2;
+            const X = i => mode === 'value' ? xAt(i) : xBar(i);
+            const Y = v => mt + ih - ((v - lo) / (hi - lo)) * ih;
+            const fmt = v => Number(v).toLocaleString('uk-UA', { maximumFractionDigits: 0 });
+
+            let grid = '';
+            for (let t = 0; t <= 4; t++) {
+                const v = lo + ((hi - lo) * t) / 4, y = Y(v);
+                grid += `<line x1="${ml}" x2="${W - mr}" y1="${y}" y2="${y}" stroke="#e3e7f1"/><text x="${ml - 8}" y="${y + 4}" text-anchor="end" font-size="11" fill="#6b7488">${fmt(v)}</text>`;
+            }
+            const step = Math.max(1, Math.ceil(n / 7));
+            let xl = '';
+            series.forEach((p, i) => { if (i % step === 0 || i === n - 1) xl += `<text x="${X(i)}" y="${H - 14}" text-anchor="middle" font-size="11" fill="#6b7488">${p.date.slice(5)}</text>`; });
+
+            let shape = '';
+            if (mode === 'value') {
+                const d = vals.map((v, i) => `${i ? 'L' : 'M'}${xAt(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+                shape = `<path d="${d}" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linejoin="round"/>` +
+                    vals.map((v, i) => `<circle cx="${xAt(i)}" cy="${Y(v)}" r="3.5" fill="#fff" stroke="#4f46e5" stroke-width="2"/>`).join('');
+            } else {
+                const bw = Math.max(4, Math.min(44, band * 0.62)), y0 = Y(0);
+                shape = vals.map((v, i) => `<rect x="${xBar(i) - bw / 2}" y="${Math.min(Y(v), y0)}" width="${bw}" height="${Math.max(1, Math.abs(Y(v) - y0))}" rx="3" fill="#06b6d4"/>`).join('');
+            }
+            const diffs = pts.slice(1).filter(p => p.days > 0);
+            const totalDelta = diffs.reduce((a, p) => a + p.delta, 0), totalDays = diffs.reduce((a, p) => a + p.days, 0);
+            const perWeek = totalDays ? (totalDelta / totalDays) * 7 : null;
+            const last = pts[pts.length - 1];
+
+            body.innerHTML = `
+                <div class="odo-stats">
+                    <div class="stat-chip"><span class="stat-num">${fmtOdo(last.v)}</span> зараз (${last.date})</div>
+                    <div class="stat-chip"><span class="stat-num">${pts.length}</span> оновлень</div>
+                    ${perWeek != null ? `<div class="stat-chip"><span class="stat-num">${fmt(perWeek / ODO_DIVISOR)}</span> в середньому за тиждень</div>` : ''}
+                </div>
+                <div class="odo-chart-wrap">
+                    <svg id="odo-svg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block; touch-action:pan-y;">
+                        ${grid}${shape}${xl}
+                        <line id="odo-guide" y1="${mt}" y2="${mt + ih}" stroke="#94a3b8" stroke-dasharray="4 3" style="display:none"/>
+                        <rect id="odo-hit" x="${ml}" y="${mt}" width="${iw}" height="${ih}" fill="transparent"/>
+                    </svg>
+                    <div id="odo-tip" class="odo-tip" style="display:none"></div>
+                </div>
+                <div class="odo-hint">Наведи курсор на графік (або торкнись), щоб побачити точні значення.</div>`;
+
+            const svg = body.querySelector('#odo-svg'), tip = body.querySelector('#odo-tip'), guide = body.querySelector('#odo-guide');
+            const wrap = body.querySelector('.odo-chart-wrap');
+            const move = e => {
+                const r = svg.getBoundingClientRect();
+                const x = (e.clientX - r.left) * (W / r.width);
+                let i;
+                if (mode === 'value') i = n === 1 ? 0 : Math.round(((x - ml) / iw) * (n - 1));
+                else i = Math.floor((x - ml) / band);
+                i = Math.max(0, Math.min(n - 1, i));
+                const p = series[i], gx = X(i);
+                guide.setAttribute('x1', gx); guide.setAttribute('x2', gx); guide.style.display = '';
+                tip.innerHTML = `<b>${p.date}</b><br>Одометр: <b>${fmt(p.v / ODO_DIVISOR)}</b>` +
+                    (p.delta != null ? `<br>Приріст: <b>${p.delta >= 0 ? '+' : ''}${fmt(p.delta / ODO_DIVISOR)}</b> за ${p.days} дн.` : '<br><span style="opacity:.7">перше показання</span>');
+                tip.style.display = 'block';
+                const wr = wrap.getBoundingClientRect();
+                let left = (gx / W) * r.width + (r.left - wr.left) + 12;
+                if (left + 190 > wr.width) left = (gx / W) * r.width + (r.left - wr.left) - 190 - 12;
+                tip.style.left = Math.max(4, left) + 'px';
+                tip.style.top = '14px';
+            };
+            const hit = body.querySelector('#odo-hit');
+            hit.addEventListener('pointermove', move);
+            hit.addEventListener('pointerdown', move);
+            hit.addEventListener('pointerleave', () => { tip.style.display = 'none'; guide.style.display = 'none'; });
+        }
+
+        window.renderFleetOverview = function() {
+            const out = document.getElementById('fleet-output');
+            const fleet = FLEET_DATA;
+            const lastSeen = FLEET_LAST_SEEN;
+            const sortBy = document.getElementById('fleet-sort-by').value;
+            const sortEntBy = document.getElementById('fleet-sort-ent-by') ? document.getElementById('fleet-sort-ent-by').value : 'name';
+
+            window.FLEET_ROW_MAP = {};
+            window.FLEET_ADD_ROW_MAP = {};
+            window.FLEET_ENT_MAP = {};
+            let rowCounter = 0;
+
+            let entKeys = Object.keys(fleet).sort((a, b) => a.localeCompare(b, 'uk'));
+            if (!entKeys.length) {
+                out.innerHTML = "<p>Дані автопарку відсутні. Додай перший борт формою вище або запусти <code>fleet_import.py</code>.</p>";
+                renderLineStats();
+                renderMismatchBanner();
+                return;
+            }
+
+            if (sortEntBy === 'count_desc') entKeys.sort((a, b) => Object.keys(fleet[b] || {}).length - Object.keys(fleet[a] || {}).length || a.localeCompare(b, 'uk'));
+            else if (sortEntBy === 'count_asc') entKeys.sort((a, b) => Object.keys(fleet[a] || {}).length - Object.keys(fleet[b] || {}).length || a.localeCompare(b, 'uk'));
+
+            const typeFilter = document.getElementById('fleet-filter-type') ? document.getElementById('fleet-filter-type').value : '';
+            const entFilter = document.getElementById('fleet-filter-ent') ? document.getElementById('fleet-filter-ent').value : '';
+            const searchTerm = document.getElementById('fleet-search') ? document.getElementById('fleet-search').value.toLowerCase().trim() : '';
+            if (entFilter) entKeys = entKeys.filter(e => e === entFilter);
+
+            function busSortValue(key, info) {
+                const seen = lastSeen[key];
+                const days = seen ? daysSince(seen.date) : null;
+                switch (sortBy) {
+                    case 'model': return (info.model || '').toLowerCase();
+                    case 'type': return TYPE_LABELS[getFleetType(info)] || '';
+                    case 'year': return parseInt(info.year) || 0;
+                    case 'idle_desc': return days === null ? 999999 : -days;   // найдовший простій — перший
+                    case 'idle_asc': return days === null ? 999999 : days;    // найсвіжіші — перші
+                    case 'line_new': return info.line_start || '0000-00-00';  // сортуємо і реверсуємо нижче
+                    case 'line_old': return info.line_start || '9999-99-99';
+                    case 'line_missing': return info.line_start ? 1 : 0;      // без дати (0) — спочатку
+                    case 'odo_desc': { const o = odoForFleetKey(key, info); return o ? -Number(o.o.value) : 1e18; }  // без одометра — в кінці
+                    case 'odo_asc':  { const o = odoForFleetKey(key, info); return o ? Number(o.o.value) : 1e18; }
+                    default: return (info.plate || key).toLowerCase();        // plate
+                }
+            }
+
+            let totalOk = 0, totalShort = 0, totalLong = 0;
+            let html = '';
+
+            entKeys.forEach((ent, entIdx) => {
+                const buses = fleet[ent] || {};
+                let busKeys = Object.keys(buses).sort((a, b) => {
+                    const va = busSortValue(a, buses[a] || {});
+                    const vb = busSortValue(b, buses[b] || {});
+                    if (typeof va === 'number' && typeof vb === 'number') return va - vb;
+                    return String(va).localeCompare(String(vb));
+                });
+                if (sortBy === 'line_new') busKeys.reverse();
+                if (typeFilter) busKeys = busKeys.filter(k => getFleetType(buses[k] || {}) === typeFilter);
+                if (searchTerm) busKeys = busKeys.filter(k => {
+                    const info = buses[k] || {};
+                    return String(info.plate || k).toLowerCase().includes(searchTerm) ||
+                        String(info.model || '').toLowerCase().includes(searchTerm);
+                });
+                if ((typeFilter || searchTerm) && !busKeys.length) return; // нічого не підходить — не показуємо секцію
+
+                let entOk = 0, entShort = 0, entLong = 0;
+                let rows = '';
+
+                busKeys.forEach(key => {
+                    const info = buses[key] || {};
+                    const seen = lastSeen[key];
+                    const days = seen ? daysSince(seen.date) : null;
+
+                    let cls, label;
+                    if (days === null) {
+                        cls = 'idle-long'; label = 'Ніколи не бачили в треку'; entLong++;
+                    } else if (days >= IDLE_LONG_DAYS) {
+                        cls = 'idle-long'; label = `🔴 Не на лінії ${days} дн.`; entLong++;
+                    } else if (days >= IDLE_SHORT_DAYS) {
+                        cls = 'idle-short'; label = `🟡 Не на лінії ${days} дн.`; entShort++;
+                    } else {
+                        cls = 'idle-ok'; label = days === 0 ? '🟢 Сьогодні на лінії' : `🟢 ${days} дн. тому`; entOk++;
+                    }
+
+                    const rowId = 'r' + (rowCounter++);
+                    FLEET_ROW_MAP[rowId] = { ent, key };
+                    const rowVType = getFleetType(info);
+
+                    rows += `<tr class="${cls}">
+                        <td><input autocomplete="off" type="checkbox" class="row-check" id="chk_${rowId}" onchange="updateBulkBar()"></td>
+                        <td>
+                            <input autocomplete="off" class="cell-input" id="ent_${rowId}" list="fleet-ent-list" value="${escapeAttr(ent)}" style="min-width:calc(130px + var(--field-width-extra, 0px));" title="Зміни назву і натисни 💾, щоб перенести борт в інше підприємство">
+                        </td>
+                        <td><textarea autocomplete="off" class="cell-input resizable-field" id="p_${rowId}" rows="1">${escapeAttr(info.plate || key)}</textarea></td>
+                        <td>
+                            <textarea autocomplete="off" class="cell-input resizable-field" id="m_${rowId}" style="min-width:calc(190px + var(--field-width-extra, 0px));" rows="1">${escapeAttr(info.model || '')}</textarea>
+                            <select id="t_${rowId}" style="width:auto; display:inline-block; margin-top:4px; font-size:0.78em; padding:3px 6px;">
+                                <option value="" ${!info.vtype ? 'selected' : ''}>Авто: ${TYPE_LABELS[guessVehicleType(info.model)]}</option>
+                                <option value="bus" ${info.vtype==='bus'?'selected':''}>🚌 Автобус</option>
+                                <option value="trolleybus" ${info.vtype==='trolleybus'?'selected':''}>🚎 Тролейбус</option>
+                                <option value="tram" ${info.vtype==='tram'?'selected':''}>🚋 Трамвай</option>
+                                <option value="electrobus" ${normType(info.vtype)==='electrobus'?'selected':''}>⚡ Електробус</option>
+                            </select>
+                        </td>
+                        <td><textarea autocomplete="off" class="cell-input resizable-field" id="y_${rowId}" style="width:calc(70px + var(--field-width-extra, 0px));" rows="1">${escapeAttr(info.year || '')}</textarea></td>
+                        <td><input autocomplete="off" type="text" class="cell-input date-field" id="line_${rowId}" value="${escapeAttr(info.line_start || '')}" placeholder="РРРР-ММ-ДД"></td>
+                        <td>${odoCellHtml(key, info)}</td>
+                        <td>${seen ? `${seen.date} ${seen.time || ''} (${seen.route || ''})` : '—'}</td>
+                        <td>${label}</td>
+                        <td style="white-space:nowrap;">
+                            <button class="btn-save" onclick="saveFleetRow('${rowId}')" title="Зберегти зміни в цьому рядку">💾</button>
+                            <button class="btn-delete" onclick="deleteFleetVehicle('${rowId}')" title="Видалити борт">🗑️</button>
+                        </td>
+                    </tr>`;
+                });
+
+                totalOk += entOk; totalShort += entShort; totalLong += entLong;
+
+                const addRowId = 'add' + entIdx;
+                FLEET_ADD_ROW_MAP[addRowId] = ent;
+                const addRow = `<tr style="background:#f4faff;">
+                        <td></td>
+                        <td style="color:#999; font-size:0.85em;">${ent}</td>
+                        <td><textarea autocomplete="off" id="np_${addRowId}" placeholder="Номер" class="resizable-field" rows="1"></textarea></td>
+                        <td>
+                            <textarea autocomplete="off" id="nm_${addRowId}" placeholder="Марка/модель" class="cell-input resizable-field" style="min-width:calc(190px + var(--field-width-extra, 0px));" rows="1"></textarea>
+                            <select id="nt_${addRowId}" style="width:auto; display:inline-block; margin-top:4px; font-size:0.78em; padding:3px 6px;">
+                                <option value="">Авто</option>
+                                <option value="bus">🚌 Автобус</option>
+                                <option value="trolleybus">🚎 Тролейбус</option>
+                                <option value="tram">🚋 Трамвай</option>
+                                <option value="electrobus">⚡ Електробус</option>
+                            </select>
+                        </td>
+                        <td><textarea autocomplete="off" id="ny_${addRowId}" placeholder="Рік" class="resizable-field" style="width:calc(70px + var(--field-width-extra, 0px));" rows="1"></textarea></td>
+                        <td><input autocomplete="off" type="text" class="date-field" id="nline_${addRowId}" placeholder="РРРР-ММ-ДД"></td>
+                        <td colspan="3" style="color:#999; font-size:0.9em;">➕ новий борт у «${ent}»</td>
+                        <td><button class="btn-save" onclick="addFleetRowInline('${addRowId}')">Додати</button></td>
+                    </tr>`;
+
+                const entId = 'ent' + entIdx;
+                FLEET_ENT_MAP[entId] = ent;
+
+                html += `<h4 class="fleet-ent-title">${ent}
+                        <span style="font-weight:normal;color:#555;">
+                            (${busKeys.length} борт${busKeys.length === 1 ? '' : (busKeys.length < 5 ? 'и' : 'ів')} —
+                            🟢${entOk} 🟡${entShort} 🔴${entLong})
+                        </span>
+                        <span class="ent-actions">
+                            <button class="btn-rename" onclick="renameEnterprise('${entId}')" title="Перейменувати підприємство">✏️ Перейменувати</button>
+                            <button class="btn-delete" onclick="deleteEnterprise('${entId}')" title="Видалити підприємство і всі борти в ньому">🗑️ Видалити парк</button>
+                        </span>
+                    </h4>
+                    <div class="table-scroll">
+                    <table class="fleet-table">
+                        <tr>
+                            <th style="width:34px;"><input autocomplete="off" type="checkbox" class="row-check" title="Обрати/зняти всі борти цього підприємства" onchange="toggleAllInSection(this)"></th>
+                            <th style="min-width:130px;">Підприємство</th><th style="min-width:80px;">Номер</th><th style="min-width:210px;">Марка / модель</th><th style="width:70px;">Рік</th><th style="min-width:130px;">Вихід на лінію</th>
+                            <th style="min-width:120px;">🛣️ Одометр</th><th>Востаннє на лінії</th><th>Стан</th><th>Дії</th>
+                        </tr>
+                        ${rows}
+                        ${addRow}
+                    </table>
+                    </div>`;
+            });
+
+            const summary = `<div class="fleet-summary">
+                <strong>Разом по всьому парку (${entKeys.length} підприємств):</strong>
+                🟢 ${totalOk} на лінії •
+                🟡 ${totalShort} коротка перерва (${IDLE_SHORT_DAYS}-${IDLE_LONG_DAYS - 1} дн.) •
+                🔴 ${totalLong} довга перерва / не бачили (${IDLE_LONG_DAYS}+ дн.)
+            </div>`;
+
+            out.innerHTML = summary + html;
+            renderCitySummary();
+            renderModelStats();
+            renderLineStats();
+            renderMismatchBanner();
+            updateBulkBar();
+        };
+
+        // ---- Працює зараз / виходив сьогодні (за last_seen, який пише provider.py щоцикл).
+        const ONLINE_WINDOW_SEC = 20 * 60;
+        // Стан борту за простоєм (так само, як кольори рядків у таблиці автопарку):
+        // 🟢 на лінії (< IDLE_SHORT_DAYS дн.), 🟡 нещодавно стоїть, 🔴 довго стоїть / не бачили.
+        function fleetStatus(key) {
+            const s = FLEET_LAST_SEEN[key];
+            const d = s ? daysSince(s.date) : null;
+            if (d === null || d >= IDLE_LONG_DAYS) return 'long';
+            if (d >= IDLE_SHORT_DAYS) return 'short';
+            return 'ok';
+        }
+        function isOnlineNow(key) {
+            const s = FLEET_LAST_SEEN[key];
+            return !!(s && s.ts && (Date.now() / 1000 - s.ts) <= ONLINE_WINDOW_SEC);
+        }
+        function seenToday(key) {
+            const s = FLEET_LAST_SEEN[key];
+            return !!(s && s.date === todayStr());
+        }
+
+        window.renderCitySummary = function() {
+            const box = document.getElementById('city-summary');
+            if (!box) return;
+            const blank = () => ({ total: 0, ok: 0, short: 0, long: 0, today: 0 });
+            const all = blank(), byType = {}, byEnt = {};
+            Object.keys(FLEET_DATA).forEach(ent => {
+                const buses = FLEET_DATA[ent] || {};
+                Object.keys(buses).forEach(key => {
+                    const vt = getFleetType(buses[key] || {});
+                    const st = fleetStatus(key), td = seenToday(key);
+                    [all, byType[vt] || (byType[vt] = blank()), byEnt[ent] || (byEnt[ent] = blank())].forEach(c => {
+                        c.total++; c[st]++; if (td) c.today++;
+                    });
+                });
+            });
+            const row = (name, c) => `<tr><td><b>${name}</b></td><td>${c.total}</td>
+                <td style="color:var(--success); font-weight:800;">${c.ok}</td>
+                <td style="color:var(--warning); font-weight:800;">${c.short}</td>
+                <td style="color:var(--danger); font-weight:800;">${c.long}</td>
+                <td>${c.today}</td><td>${c.total - c.today}</td></tr>`;
+            const head = n => `<tr><th>${n}</th><th>Всього</th><th>🟢 На лінії (до ${IDLE_SHORT_DAYS} дн.)</th><th>🟡 Нещодавно стоїть (${IDLE_SHORT_DAYS}–${IDLE_LONG_DAYS - 1} дн.)</th><th>🔴 Довго стоїть (${IDLE_LONG_DAYS}+ дн.)</th><th>Виходили сьогодні</th><th>Не виходили сьогодні</th></tr>`;
+            const typeRows = Object.keys(byType).sort().map(t => row(TYPE_LABELS[t] || t, byType[t])).join('');
+            const entRows = Object.keys(byEnt).sort((a, b) => byEnt[b].total - byEnt[a].total || a.localeCompare(b, 'uk'))
+                .map(e => row(escapeAttr(e), byEnt[e])).join('');
+            box.innerHTML = `
+                <div class="stats-box">
+                    <div class="stat-chip"><span class="stat-num">${all.total}</span> всього ТЗ по місту</div>
+                    <div class="stat-chip" style="border-color:#bff0d1; background:var(--success-bg);">🟢 <span class="stat-num">${all.ok}</span> на лінії</div>
+                    <div class="stat-chip" style="border-color:#fde68a; background:var(--warning-bg);">🟡 <span class="stat-num">${all.short}</span> нещодавно стоїть</div>
+                    <div class="stat-chip" style="border-color:#fca5a5; background:var(--danger-bg);">🔴 <span class="stat-num">${all.long}</span> довго стоїть</div>
+                    <div class="stat-chip"><span class="stat-num">${all.today}</span> виходили сьогодні</div>
+                </div>
+                <div class="table-scroll"><table class="fleet-table">${head('За типом')}${typeRows}</table></div>
+                <div class="table-scroll" style="margin-top:10px;"><table class="fleet-table">${head('За парком')}${entRows}</table></div>`;
+        };
+
+        // ---- Скільки одиниць кожної моделі: по місту разом і в розрізі парків.
+        // Групуємо за моделлю без урахування регістру/зайвих пробілів; порожня
+        // модель йде в «Без моделі». Береться з автопарку (FLEET_DATA). ----
+        window.renderModelStats = function() {
+            const box = document.getElementById('model-stats');
+            if (!box) return;
+            const term = (document.getElementById('model-stats-search').value || '').toLowerCase().trim();
+            const typeFilter = document.getElementById('model-stats-type').value;
+
+            const groups = {}; // ключ -> { name, vtype, total, ents: {ent: n}, names: {spelling: n} }
+            let totalAll = 0;
+            Object.keys(FLEET_DATA).forEach(ent => {
+                Object.keys(FLEET_DATA[ent] || {}).forEach(fkey => {
+                    const info = FLEET_DATA[ent][fkey];
+                    if (!info) return;
+                    const vt = getFleetType(info);
+                    if (typeFilter && vt !== typeFilter) return;
+                    const rawName = String(info.model || '').replace(/\s+/g, ' ').trim();
+                    const name = rawName || 'Без моделі';
+                    if (term && !name.toLowerCase().includes(term)) return;
+                    const key = name.toLowerCase();
+                    const g = groups[key] || (groups[key] = { vtype: vt, total: 0, ok: 0, short: 0, long: 0, ents: {}, names: {} });
+                    g.total++; totalAll++;
+                    g[fleetStatus(fkey)]++;
+                    g.ents[ent] = (g.ents[ent] || 0) + 1;
+                    g.names[name] = (g.names[name] || 0) + 1;
+                });
+            });
+
+            const keys = Object.keys(groups).sort((a, b) => groups[b].total - groups[a].total || a.localeCompare(b, 'uk'));
+            if (!keys.length) { box.innerHTML = '<p style="color:#777;">Нічого не знайдено.</p>'; return; }
+
+            const rows = keys.map(k => {
+                const g = groups[k];
+                const name = Object.keys(g.names).sort((a, b) => g.names[b] - g.names[a])[0];
+                const ents = Object.keys(g.ents).sort((a, b) => g.ents[b] - g.ents[a] || a.localeCompare(b, 'uk'))
+                    .map(e => `<span class="stat-chip" style="display:inline-flex; margin:2px 4px 2px 0; padding:4px 10px;">${escapeAttr(e)}: <b>${g.ents[e]}</b></span>`).join('');
+                return `<tr>
+                    <td><b>${escapeAttr(name)}</b></td>
+                    <td>${TYPE_LABELS[g.vtype] || ''}</td>
+                    <td style="font-weight:800; font-size:1.1em;">${g.total}</td>
+                    <td><span style="color:var(--success); font-weight:800;">🟢 ${g.ok}</span> · <span style="color:var(--warning); font-weight:800;">🟡 ${g.short}</span> · <span style="color:var(--danger); font-weight:800;">🔴 ${g.long}</span></td>
+                    <td>${ents}</td>
+                </tr>`;
+            }).join('');
+
+            box.innerHTML = `
+                <div class="stats-box"><div><span class="stat-num">${keys.length}</span> моделей, <span class="stat-num">${totalAll}</span> одиниць по місту</div></div>
+                <div class="table-scroll">
+                    <table class="fleet-table">
+                        <tr><th>Модель</th><th>Тип</th><th>По місту</th><th>🟢 / 🟡 / 🔴 за простоєм</th><th>По парках</th></tr>
+                        ${rows}
+                    </table>
+                </div>`;
+        };
+
+        // ---- Масове перенесення обраних (галочками) бортів в інше підприємство.
+        // Зручно, наприклад, щоб розкидати борти з «Невідомо» по реальних
+        // підприємствах групою, а не по одному через ent_/💾 в кожному рядку. ----
+        window.toggleAllInSection = function(headerCb) {
+            const table = headerCb.closest('table');
+            if (!table) return;
+            table.querySelectorAll('td .row-check').forEach(cb => { cb.checked = headerCb.checked; });
+            updateBulkBar();
+        };
+
+        window.selectAllFleetRows = function() {
+            document.querySelectorAll('#fleet-output td .row-check').forEach(cb => { cb.checked = true; });
+            updateBulkBar();
+        };
+
+        window.clearAllSelections = function() {
+            document.querySelectorAll('.row-check').forEach(cb => { cb.checked = false; });
+            updateBulkBar();
+        };
+
+        window.updateBulkBar = function() {
+            const bar = document.getElementById('fleet-bulk-bar');
+            if (!bar) return;
+            const n = document.querySelectorAll('#fleet-output td .row-check:checked').length;
+            const countEl = document.getElementById('bulk-count');
+            if (countEl) countEl.textContent = n;
+            bar.style.display = n ? 'flex' : 'none';
+        };
+
+        window.bulkMoveSelected = async function() {
+            const checked = Array.from(document.querySelectorAll('#fleet-output td .row-check:checked'));
+            if (!checked.length) return alert('Спочатку познач борти галочками зліва в таблиці.');
+            const targetEnt = (document.getElementById('bulk-target-ent').value || '').trim();
+            if (!targetEnt) return alert('Вкажи підприємство, куди перенести обрані борти!');
+
+            const moves = [];
+            let skippedSame = 0, collisions = 0;
+            checked.forEach(cb => {
+                const rowId = cb.id.replace('chk_', '');
+                const ref = FLEET_ROW_MAP[rowId];
+                if (!ref) return;
+                const { ent: oldEnt, key } = ref;
+                const info = FLEET_DATA[oldEnt] && FLEET_DATA[oldEnt][key];
+                if (!info) return;
+                if (oldEnt === targetEnt) { skippedSame++; return; }
+                if (FLEET_DATA[targetEnt] && FLEET_DATA[targetEnt][key]) collisions++;
+                moves.push({ oldEnt, key, info });
+            });
+
+            if (!moves.length) {
+                return alert('Немає що переносити' + (skippedSame ? ` — усі обрані вже в «${targetEnt}»` : '') + '.');
+            }
+
+            let msg = `Перенести ${moves.length} борт(ів) у «${targetEnt}»?`;
+            if (skippedSame) msg += `\n(${skippedSame} вже там — пропущено)`;
+            if (collisions) msg += `\n⚠️ ${collisions} номер(ів) вже існують у «${targetEnt}» і будуть перезаписані!`;
+            if (!confirm(msg)) return;
+
+            const updates = {};
+            moves.forEach(({ oldEnt, key, info }) => {
+                updates[`fleet/${oldEnt}/${key}`] = null;
+                updates[`fleet/${targetEnt}/${key}`] = { ...info, enterprise_name: targetEnt };
+            });
+
+            try {
+                await firebase.database().ref().update(updates);
+                alert(`✅ Перенесено ${moves.length} борт(ів) у «${targetEnt}»`);
+                loadFleetOverview();
+            } catch (e) {
+                alert('Помилка: ' + e.message);
+            }
+        };
+
+        // ---- Перейменування підприємства (парку) — переносить усі борти
+        // з fleet/{стара назва}/* у fleet/{нова назва}/*, оновлюючи enterprise_name
+        // у кожному записі. ----
+        window.renameEnterprise = async function(entId) {
+            const oldEnt = FLEET_ENT_MAP[entId];
+            if (!oldEnt) return;
+
+            const input = prompt(`Нова назва для підприємства «${oldEnt}»:`, oldEnt);
+            if (input === null) return; // скасовано
+            const newEnt = input.trim();
+            if (!newEnt) return alert('Назва не може бути порожньою!');
+            if (newEnt === oldEnt) return;
+
+            const buses = FLEET_DATA[oldEnt] || {};
+            const keys = Object.keys(buses);
+            if (!keys.length) return alert('У цього підприємства немає бортів.');
+
+            let overwriteCount = 0;
+            keys.forEach(k => { if (FLEET_DATA[newEnt] && FLEET_DATA[newEnt][k]) overwriteCount++; });
+
+            let msg = `Перейменувати «${oldEnt}» на «${newEnt}»?\nЦе перенесе всі ${keys.length} борт(ів).`;
+            if (FLEET_DATA[newEnt]) msg += `\n⚠️ Підприємство «${newEnt}» вже існує — борти обʼєднаються в одне.`;
+            if (overwriteCount) msg += `\n⚠️ ${overwriteCount} номер(ів) збігаються і будуть перезаписані!`;
+            if (!confirm(msg)) return;
+
+            const updates = {};
+            keys.forEach(k => {
+                updates[`fleet/${oldEnt}/${k}`] = null;
+                updates[`fleet/${newEnt}/${k}`] = { ...buses[k], enterprise_name: newEnt };
+            });
+
+            try {
+                await firebase.database().ref().update(updates);
+                alert(`✅ Перейменовано «${oldEnt}» → «${newEnt}»`);
+                loadFleetOverview();
+            } catch (e) {
+                alert('Помилка: ' + e.message);
+            }
+        };
+
+        // ---- Видалення підприємства (парку) цілком — разом з усіма бортами
+        // в ньому. Обов'язково питає підтвердження і показує кількість бортів,
+        // які будуть видалені. ----
+        window.deleteEnterprise = async function(entId) {
+            const ent = FLEET_ENT_MAP[entId];
+            if (!ent) return;
+            const buses = FLEET_DATA[ent] || {};
+            const count = Object.keys(buses).length;
+
+            if (!confirm(`Точно видалити підприємство «${ent}» і всі ${count} борт${count === 1 ? '' : (count < 5 ? 'и' : 'ів')} у ньому?\n\nЦю дію не можна скасувати!`)) return;
+
+            try {
+                await firebase.database().ref(`fleet/${ent}`).remove();
+                alert(`✅ Підприємство «${ent}» видалено`);
+                loadFleetOverview();
+            } catch (e) {
+                alert('Помилка: ' + e.message);
+            }
+        };
+
+        // ---- Редагування номера/підприємства/даних прямо в рядку таблиці ----
+        window.saveFleetRow = function(rowId) {
+            const ref = FLEET_ROW_MAP[rowId];
+            if (!ref) return;
+            const { ent: oldEnt, key: oldKey } = ref;
+            const plate = document.getElementById(`p_${rowId}`).value.trim();
+            if (!plate) return alert('Номер не може бути порожнім!');
+            const newKey = canonicalPlateKey(plate);
+            if (!newKey) return alert('Некоректний номер!');
+            const entInput = document.getElementById(`ent_${rowId}`);
+            const newEnt = (entInput ? entInput.value.trim() : '') || oldEnt;
+            const lineEl = document.getElementById(`line_${rowId}`);
+            normalizeDateField(lineEl);
+
+            const oldInfo = (FLEET_DATA[oldEnt] && FLEET_DATA[oldEnt][oldKey]) || {};
+            const info = {
+                enterprise_name: newEnt,
+                plate: plate,
+                model: document.getElementById(`m_${rowId}`).value.trim(),
+                vtype: document.getElementById(`t_${rowId}`).value || '',
+                year: document.getElementById(`y_${rowId}`).value.trim(),
+                line_start: lineEl.value || '',
+                excel_status: oldInfo.excel_status || '',
+                note: oldInfo.note || '',
+                fleet_no: oldInfo.fleet_no != null ? oldInfo.fleet_no : null
+            };
+
+            if (newEnt === oldEnt && newKey === oldKey) {
+                firebase.database().ref(`fleet/${oldEnt}/${oldKey}`).set(info)
+                    .then(() => loadFleetOverview())
+                    .catch(e => alert('Помилка: ' + e.message));
+                return;
+            }
+
+            if (FLEET_DATA[newEnt] && FLEET_DATA[newEnt][newKey] &&
+                !confirm('Борт із таким номером вже є в підприємстві призначення. Перезаписати?')) return;
+
+            const movedMsg = newEnt !== oldEnt ? `✅ Перенесено в «${newEnt}»` : '✅ Номер змінено';
+            firebase.database().ref(`fleet/${newEnt}/${newKey}`).set(info)
+                .then(() => firebase.database().ref(`fleet/${oldEnt}/${oldKey}`).remove())
+                .then(() => { alert(movedMsg); loadFleetOverview(); })
+                .catch(e => alert('Помилка: ' + e.message));
+        };
+
+        // ---- Додавання нового борту прямо в кінці таблиці конкретного підприємства ----
+        window.addFleetRowInline = function(addRowId) {
+            const ent = FLEET_ADD_ROW_MAP[addRowId];
+            if (!ent) return;
+            const plate = document.getElementById(`np_${addRowId}`).value.trim();
+            if (!plate) return alert('Вкажи номер!');
+            const key = canonicalPlateKey(plate);
+            if (!key) return alert('Некоректний номер!');
+
+            if (FLEET_DATA[ent] && FLEET_DATA[ent][key] &&
+                !confirm('Такий номер вже є в цьому підприємстві. Перезаписати?')) return;
+
+            const nlineEl = document.getElementById(`nline_${addRowId}`);
+            normalizeDateField(nlineEl);
+            const info = {
+                enterprise_name: ent,
+                plate: plate,
+                model: document.getElementById(`nm_${addRowId}`).value.trim(),
+                vtype: document.getElementById(`nt_${addRowId}`).value || '',
+                year: document.getElementById(`ny_${addRowId}`).value.trim(),
+                line_start: nlineEl.value || '',
+                note: '',
+                fleet_no: null
+            };
+
+            firebase.database().ref(`fleet/${ent}/${key}`).set(info)
+                .then(() => loadFleetOverview())
+                .catch(e => alert('Помилка: ' + e.message));
+        };
+
+        // ---- Статистика виходу на лінію (за роками/місяцями + по підприємствах за період) ----
+        // Період за замовчуванням: з початку поточного місяця по сьогодні.
+        let STATS_FROM = (() => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); })();
+        let STATS_TO = todayStr();
+
+        window.updateStatsPeriod = function() {
+            const fromEl = document.getElementById('stats_from');
+            const toEl = document.getElementById('stats_to');
+            normalizeDateField(fromEl);
+            normalizeDateField(toEl);
+            const from = fromEl.value;
+            const to = toEl.value;
+            if (!from || !to) return alert('Вкажи обидві дати періоду!');
+            if (from > to) return alert('Дата «з» не може бути пізніше дати «по»!');
+            STATS_FROM = from;
+            STATS_TO = to;
+            renderLineStats();
+        };
+
+        function renderLineStats() {
+            const box = document.getElementById('fleet-stats');
+            if (!box) return;
+            const counts = {}; // 'YYYY-MM' -> кількість (загалом, по всьому парку)
+            let totalWithDate = 0;
+
+            Object.values(FLEET_DATA).forEach(buses => {
+                Object.values(buses || {}).forEach(info => {
+                    if (!info || !info.line_start) return;
+                    totalWithDate++;
+                    const ym = info.line_start.slice(0, 7);
+                    counts[ym] = (counts[ym] || 0) + 1;
+                });
+            });
+
+            // Розбивка по підприємствах (яке ТТУ/парк скільки бортів вивело на
+            // лінію) за обраний період STATS_FROM..STATS_TO.
+            let periodTotal = 0;
+            const byEnt = {};
+            Object.keys(FLEET_DATA).forEach(ent => {
+                const buses = FLEET_DATA[ent] || {};
+                let inPeriod = 0, total = 0;
+                Object.values(buses).forEach(info => {
+                    total++;
+                    if (info && info.line_start && info.line_start >= STATS_FROM && info.line_start <= STATS_TO) {
+                        inPeriod++;
+                        periodTotal++;
+                    }
+                });
+                byEnt[ent] = { inPeriod, total };
+            });
+            const entRows = Object.keys(byEnt)
+                .sort((a, b) => byEnt[b].inPeriod - byEnt[a].inPeriod || a.localeCompare(b, 'uk'))
+                .map(ent => `<tr><td>${ent}</td><td>${byEnt[ent].inPeriod}</td><td>${byEnt[ent].total}</td></tr>`).join('');
+
+            const periodBlock = `
+                <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
+                    <div><label>Період з</label><input autocomplete="off" type="text" class="date-field" id="stats_from" value="${STATS_FROM}" placeholder="РРРР-ММ-ДД"></div>
+                    <div><label>по</label><input autocomplete="off" type="text" class="date-field" id="stats_to" value="${STATS_TO}" placeholder="РРРР-ММ-ДД"></div>
+                    <button class="btn-refresh" onclick="updateStatsPeriod()" style="margin-top:5px;">📊 Порахувати</button>
+                </div>
+                <div class="stats-box">
+                    <div><span class="stat-num">${periodTotal}</span> вийшло на лінію за період ${STATS_FROM} — ${STATS_TO}</div>
+                </div>
+                <div class="table-scroll">
+                    <table class="fleet-table" style="width:auto; min-width:360px;">
+                        <tr><th>Парк / підприємство</th><th>За обраний період</th><th>Всього бортів</th></tr>
+                        ${entRows || '<tr><td colspan="3">Немає даних автопарку — онови автопарк або додай борти.</td></tr>'}
+                    </table>
+                </div>`;
+
+            if (!totalWithDate) {
+                box.innerHTML = periodBlock + '<p style="color:#777; margin-top:14px;">Немає загальних даних про дату виходу на лінію. Заповнюй поле «Вихід на лінію» при додаванні або редагуванні борту — тоді тут з’явиться повна статистика по роках і місяцях.</p>';
+                return;
+            }
+
+            const curYear = todayStr().slice(0, 4);
+            const curYm = todayStr().slice(0, 7);
+
+            let yearTotal = 0, monthTotal = 0;
+            const byYear = {};
+            Object.keys(counts).forEach(ym => {
+                const y = ym.slice(0, 4);
+                byYear[y] = (byYear[y] || 0) + counts[ym];
+                if (y === curYear) yearTotal += counts[ym];
+                if (ym === curYm) monthTotal += counts[ym];
+            });
+
+            const years = Object.keys(byYear).sort().reverse();
+            const yearRows = years.map(y => `<tr><td>${y}</td><td>${byYear[y]}</td></tr>`).join('');
+            const monthsThisYear = Object.keys(counts).filter(ym => ym.startsWith(curYear)).sort();
+            const monthRows = monthsThisYear.map(ym => `<tr><td>${ym}</td><td>${counts[ym]}</td></tr>`).join('');
+
+            box.innerHTML = periodBlock + `
+                <div class="stats-box">
+                    <div><span class="stat-num">${yearTotal}</span> вийшло на лінію в ${curYear} році</div>
+                    <div><span class="stat-num">${monthTotal}</span> вийшло на лінію за поточний місяць (${curYm})</div>
+                    <div><span class="stat-num">${totalWithDate}</span> бортів з відомою датою виходу (загалом)</div>
+                </div>
+                <details>
+                    <summary style="cursor:pointer; color:#3498db; font-weight:bold;">📅 Розбивка по роках і місяцях (загалом по парку)</summary>
+                    <div style="display:flex; gap:30px; flex-wrap:wrap; margin-top:8px;">
+                        <table class="fleet-table" style="width:auto;">
+                            <tr><th>Рік</th><th>Кількість</th></tr>
+                            ${yearRows}
+                        </table>
+                        <table class="fleet-table" style="width:auto;">
+                            <tr><th>Місяць (${curYear})</th><th>Кількість</th></tr>
+                            ${monthRows || '<tr><td colspan="2">—</td></tr>'}
+                        </table>
+                    </div>
+                </details>`;
+        }
+
+        // ---- Пошук бортів, які реально є в треку (last_seen), але під іншим
+        // написанням номера (кирилиця/латиниця) — саме це і виглядає як
+        // "борт є на маршруті, а система його не бачить". ----
+        function findKeyMismatches() {
+            const lastSeenKeys = Object.keys(FLEET_LAST_SEEN);
+            const results = [];
+            for (const ent in FLEET_DATA) {
+                for (const key in FLEET_DATA[ent]) {
+                    if (FLEET_LAST_SEEN[key]) continue; // вже збігається напряму — все ок
+                    const canon = canonicalPlateKey(key);
+                    const match = lastSeenKeys.find(lk => lk !== key && canonicalPlateKey(lk) === canon);
+                    if (match) {
+                        results.push({
+                            ent, fleetKey: key, lastSeenKey: match,
+                            plate: (FLEET_DATA[ent][key] && FLEET_DATA[ent][key].plate) || key
+                        });
+                    }
+                }
+            }
+            return results;
+        }
+
+        function renderMismatchBanner() {
+            const box = document.getElementById('fleet-mismatch');
+            if (!box) return;
+            const mismatches = findKeyMismatches();
+            window.CURRENT_MISMATCHES = mismatches;
+            if (!mismatches.length) { box.innerHTML = ''; return; }
+
+            box.innerHTML = `<div class="mismatch-box">
+                ⚠️ Знайдено ${mismatches.length} борт${mismatches.length === 1 ? '' : (mismatches.length < 5 ? 'и' : 'ів')},
+                які реально є в треку (last_seen), але записані під іншим написанням номера
+                (кирилиця/латиниця виглядають однаково, але це різні символи) — тому вище вони
+                показані як «не на лінії», хоча насправді на маршруті.
+                <div class="mismatch-actions">
+                    <button class="btn-save" onclick="fixAllMismatches()">🔧 Виправити всі одразу (${mismatches.length})</button>
+                </div>
+                <div style="margin-top:8px;">
+                    ${mismatches.map((m, i) => `
+                        <div style="margin-bottom:6px;">
+                            <b>${m.plate}</b> (${m.ent}): в автопарку записано як «${m.fleetKey}»,
+                            в треку бачили як «${m.lastSeenKey}»
+                            <button class="btn-save" onclick="fixKeyMismatch(${i})">🔧 Виправити</button>
+                        </div>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        window.fixKeyMismatch = function(i) {
+            const m = (window.CURRENT_MISMATCHES || [])[i];
+            if (!m) return;
+            if (!confirm(`Перезаписати ключ «${m.fleetKey}» на «${m.lastSeenKey}» (як у треку) для борту ${m.plate}?`)) return;
+            const info = FLEET_DATA[m.ent][m.fleetKey];
+            firebase.database().ref(`fleet/${m.ent}/${m.lastSeenKey}`).set(info)
+                .then(() => firebase.database().ref(`fleet/${m.ent}/${m.fleetKey}`).remove())
+                .then(() => { alert('✅ Виправлено'); loadFleetOverview(); })
+                .catch(e => alert('Помилка: ' + e.message));
+        };
+
+        // ---- Автоматичне виправлення ВСІХ знайдених розбіжностей написання
+        // номера (кирилиця/латиниця) одним натисканням, без підтвердження
+        // кожного борту окремо. ----
+        window.fixAllMismatches = async function() {
+            const mismatches = window.CURRENT_MISMATCHES || [];
+            if (!mismatches.length) return alert('Розбіжностей не знайдено.');
+            if (!confirm(`Автоматично виправити всі ${mismatches.length} розбіжностей написання номера (перезаписати ключі так, як вони є в треку)?`)) return;
+
+            const updates = {};
+            mismatches.forEach(m => {
+                const info = FLEET_DATA[m.ent] && FLEET_DATA[m.ent][m.fleetKey];
+                if (!info) return;
+                updates[`fleet/${m.ent}/${m.fleetKey}`] = null;
+                updates[`fleet/${m.ent}/${m.lastSeenKey}`] = info;
+            });
+
+            try {
+                await firebase.database().ref().update(updates);
+                alert(`✅ Виправлено ${mismatches.length} борт(ів)`);
+                loadFleetOverview();
+            } catch (e) {
+                alert('Помилка: ' + e.message);
+            }
+        };
+
+        // ---- Синхронізація автопарку з "Мапінг ТЗ" ----
+        // Бере всі борти з vehicle_mapping (за їхнім поточним номером/типом) і
+        // додає в автопарк ті, яких там ще немає (шукаємо по всіх підприємствах
+        // одразу, щоб не задублювати). Тролейбуси йдуть у «ЛЕТ тролейбуси»,
+        // трамваї — у «ЛЕТ трамваї», решта (автобуси/електробуси/невідомо) —
+        // у «Невідомо», звідки їх потім можна вручну розкидати по реальних
+        // підприємствах.
+        window.syncFromMapping = async function() {
+            if (!confirm('Синхронізувати автопарк з "Мапінг ТЗ"?\n\n• Нові борти (яких ще нема) — додасться.\n• Борти, які замінили (в мапінгу вже новий номер, а в автопарку досі висить старий) — автоматично перенесуться на новий номер, підприємство збережеться.\n\nДля геть нових бортів: тролейбуси → «ЛЕТ тролейбуси», трамваї → «ЛЕТ трамваї», решта → «Невідомо».')) return;
+
+            // key -> назва підприємства, де саме в автопарку зараз лежить борт з таким номером
+            const keyLocation = {};
+            Object.keys(FLEET_DATA).forEach(ent => {
+                Object.keys(FLEET_DATA[ent] || {}).forEach(k => { keyLocation[k] = ent; });
+            });
+
+            const updates = {};
+            let added = 0, migrated = 0, skippedNoPlate = 0, skippedExists = 0;
+            const addedByEnt = {}, migratedList = [];
+
+            Object.keys(allData).forEach(id => {
+                const list = normalizeRecords(allData[id]);
+                const fr = getFilterRecord(allData[id]); // запис, активний сьогодні
+                const plate = (fr.p || '').trim();
+                if (!plate) { skippedNoPlate++; return; }
+                const key = canonicalPlateKey(plate);
+                if (!key) { skippedNoPlate++; return; }
+
+                if (keyLocation[key]) { skippedExists++; return; } // вже стоїть під актуальним номером — усе гаразд
+
+                const vType = getVehicleType(fr);
+
+                // Активного номера в автопарку нема — можливо, борт замінили,
+                // і стара картка автопарку досі лежить під ОДНИМ ІЗ ПОПЕРЕДНІХ
+                // номерів ЦЬОГО Ж трекера. Шукаємо по всій його історії.
+                const oldKey = list.map(r => canonicalPlateKey(r.p)).find(k => k && k !== key && keyLocation[k]);
+
+                if (oldKey) {
+                    const ent = keyLocation[oldKey];
+                    const oldInfo = (FLEET_DATA[ent] && FLEET_DATA[ent][oldKey]) || {};
+                    updates[`fleet/${ent}/${oldKey}`] = null;
+                    updates[`fleet/${ent}/${key}`] = {
+                        enterprise_name: ent,
+                        plate: plate,
+                        // Модель і тип: якщо вже були вручну заповнені/виправлені в автопарку —
+                        // лишаємо як є назавжди, а не переписуємо кожного разу даними з мапінгу.
+                        // З мапінгу підставляємо лише тоді, коли в автопарку це поле ще порожнє.
+                        model: oldInfo.model || fr.m || '',
+                        vtype: oldInfo.vtype || fr.t || '',
+                        year: oldInfo.year || '',
+                        line_start: oldInfo.line_start || '',
+                        excel_status: oldInfo.excel_status || '',
+                        note: oldInfo.note || `Автосинхронізовано з мапінгу (ID ${id})`,
+                        fleet_no: oldInfo.fleet_no != null ? oldInfo.fleet_no : null
+                    };
+                    keyLocation[key] = ent;
+                    delete keyLocation[oldKey];
+                    migratedList.push(`${oldInfo.plate || oldKey} → ${plate} («${ent}»)`);
+                    migrated++;
+                    return;
+                }
+
+                // геть новий борт — раніше в автопарку взагалі не траплявся
+                let ent;
+                if (vType === 'trolleybus') ent = 'ЛЕТ тролейбуси';
+                else if (vType === 'tram') ent = 'ЛЕТ трамваї';
+                else ent = 'Невідомо';
+
+                updates[`fleet/${ent}/${key}`] = {
+                    enterprise_name: ent,
+                    plate: plate,
+                    model: fr.m || '',
+                    vtype: fr.t || '',
+                    year: '',
+                    line_start: '',
+                    note: `Автосинхронізовано з мапінгу (ID ${id})`,
+                    fleet_no: null
+                };
+                keyLocation[key] = ent;
+                addedByEnt[ent] = (addedByEnt[ent] || 0) + 1;
+                added++;
+            });
+
+            if (!added && !migrated) {
+                alert(`Немає змін — автопарк уже відповідає мапінгу.\nБез номера: ${skippedNoPlate}\nВже актуальні: ${skippedExists}`);
+                return;
+            }
+
+            try {
+                await firebase.database().ref().update(updates);
+                let msg = '';
+                if (added) {
+                    const breakdown = Object.entries(addedByEnt).map(([e, n]) => `«${e}»: ${n}`).join('\n');
+                    msg += `✅ Додано нових бортів: ${added}\n${breakdown}`;
+                }
+                if (migrated) {
+                    msg += (msg ? '\n\n' : '') + `🔁 Перенесено заміни (${migrated}):\n${migratedList.join('\n')}`;
+                }
+                alert(msg);
+                loadFleetOverview();
+            } catch (e) {
+                alert('Помилка: ' + e.message);
+            }
+        };
+
+        // ---- Масове збереження: дає навводити зміни (номер, підприємство, модель,
+        // тип, рік, дату виходу на лінію) одразу в багатьох рядках і зберегти все
+        // одним натисканням — зокрема переносити борти з «Невідомо» в реальні
+        // підприємства масово, без окремого «💾» під кожним рядком. ----
+        window.saveAllFleetRows = async function() {
+            const rowIds = Object.keys(FLEET_ROW_MAP);
+            if (!rowIds.length) return alert('Немає рядків для збереження. Спочатку онови автопарк.');
+            if (!confirm(`Зберегти зміни в ${rowIds.length} рядк${rowIds.length === 1 ? 'у' : 'ах'}?`)) return;
+
+            const updates = {};
+            let changed = 0, moved = 0;
+
+            rowIds.forEach(rowId => {
+                const ref = FLEET_ROW_MAP[rowId];
+                if (!ref) return;
+                const { ent: oldEnt, key: oldKey } = ref;
+                const plateInput = document.getElementById(`p_${rowId}`);
+                if (!plateInput) return;
+                const plate = plateInput.value.trim();
+                if (!plate) return;
+                const newKey = canonicalPlateKey(plate);
+                if (!newKey) return;
+                const entInput = document.getElementById(`ent_${rowId}`);
+                const newEnt = (entInput ? entInput.value.trim() : '') || oldEnt;
+                const lineEl = document.getElementById(`line_${rowId}`);
+                normalizeDateField(lineEl);
+
+                const oldInfo = (FLEET_DATA[oldEnt] && FLEET_DATA[oldEnt][oldKey]) || {};
+                const info = {
+                    enterprise_name: newEnt,
+                    plate: plate,
+                    model: document.getElementById(`m_${rowId}`).value.trim(),
+                    vtype: document.getElementById(`t_${rowId}`).value || '',
+                    year: document.getElementById(`y_${rowId}`).value.trim(),
+                    line_start: lineEl.value || '',
+                    excel_status: oldInfo.excel_status || '',
+                    note: oldInfo.note || '',
+                    fleet_no: oldInfo.fleet_no != null ? oldInfo.fleet_no : null
+                };
+
+                if (newEnt !== oldEnt || newKey !== oldKey) {
+                    updates[`fleet/${oldEnt}/${oldKey}`] = null;
+                }
+                if (newEnt !== oldEnt) moved++;
+                updates[`fleet/${newEnt}/${newKey}`] = info;
+                changed++;
+            });
+
+            if (!changed) return alert('Немає що зберігати — перевір, що номери заповнені.');
+
+            try {
+                await firebase.database().ref().update(updates);
+                alert(`✅ Збережено рядків: ${changed}` + (moved ? `\n🔁 З них перенесено в інше підприємство: ${moved}` : ''));
+                loadFleetOverview();
+            } catch (e) {
+                alert('Помилка: ' + e.message);
+            }
+        };
+
+        window.addFleetVehicle = function() {
+            const ent = document.getElementById('fleet_new_ent').value.trim();
+            const plate = document.getElementById('fleet_new_plate').value.trim();
+            if (!ent) return alert('Вкажи підприємство!');
+            if (!plate) return alert('Вкажи номер!');
+
+            const key = canonicalPlateKey(plate);
+            if (!key) return alert('Некоректний номер!');
+
+            const newLineEl = document.getElementById('fleet_new_line');
+            normalizeDateField(newLineEl);
+            const info = {
+                enterprise_name: ent,
+                plate: plate,
+                model: document.getElementById('fleet_new_model').value.trim(),
+                vtype: document.getElementById('fleet_new_type').value || '',
+                year: document.getElementById('fleet_new_year').value.trim(),
+                line_start: newLineEl.value || '',
+                note: document.getElementById('fleet_new_note').value.trim(),
+                fleet_no: null
+            };
+
+            firebase.database().ref(`fleet/${ent}/${key}`).set(info)
+                .then(() => {
+                    alert(`✅ ${plate} додано в «${ent}»`);
+                    document.getElementById('fleet_new_plate').value = '';
+                    document.getElementById('fleet_new_model').value = '';
+                    document.getElementById('fleet_new_type').value = '';
+                    document.getElementById('fleet_new_year').value = '';
+                    document.getElementById('fleet_new_line').value = '';
+                    document.getElementById('fleet_new_note').value = '';
+                    loadFleetOverview();
+                })
+                .catch(e => alert('Помилка: ' + e.message));
+        };
+
+        window.deleteFleetVehicle = function(rowId) {
+            const ref = FLEET_ROW_MAP[rowId];
+            if (!ref) return;
+            const { ent, key } = ref;
+            const plate = (FLEET_DATA[ent] && FLEET_DATA[ent][key] && FLEET_DATA[ent][key].plate) || key;
+            if (!confirm(`Видалити ${plate} з «${ent}»?`)) return;
+            firebase.database().ref(`fleet/${ent}/${key}`).remove()
+                .then(() => {
+                    if (FLEET_DATA[ent]) delete FLEET_DATA[ent][key];
+                    renderFleetOverview();
+                })
+                .catch(e => alert('Помилка: ' + e.message));
+        };
+        // ============================================================================
+    </script>
+</body>
+</html>

@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #0b1220;
+            --panel: #101a2b;
+            --panel-2: #16223a;
+            --panel-glass: rgba(16, 26, 43, 0.86);
+            --line: rgba(255,255,255,0.08);
+            --text: #eaf0f8;
+            --text-dim: #8fa0b8;
+            --accent: #3aa6ff;
+            --accent-dim: #2a7cc4;
+            --accent-glow: rgba(58, 166, 255, 0.35);
+            --tram: #ff9142;
+            --trolley: #b16bff;
+            --bus: #ff5d7a;
+            --ok: #34d399;
+            --radius-lg: 18px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+
+            --header-1: #17253d;
+            --header-2: #101a2b;
+            --tint-a: rgba(255,255,255,0.03);
+            --tint-b: rgba(255,255,255,0.05);
+            --tint-c: rgba(255,255,255,0.09);
+            --tint-border: rgba(255,255,255,0.22);
+
+            --marker-bg: #101a2b;
+            --marker-border: rgba(255,255,255,0.18);
+            --marker-text: #eaf0f8;
+            --marker-ring: rgba(255,255,255,0.85);
+
+            --popup-bg: #101a2b;
+            --popup-text: #eaf0f8;
+            --popup-border: rgba(255,255,255,0.14);
+
+            --stop-idle: #4b5a70;
+            --shadow-soft: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        html[data-theme="light"] {
+            --bg-deep: #f3f5f9;
+            --panel: #ffffff;
+            --panel-2: #f3f5f9;
+            --panel-glass: rgba(255,255,255,0.94);
+            --line: rgba(16,24,40,0.09);
+            --text: #16202f;
+            --text-dim: #5c6a80;
+            --accent: #1f7ae0;
+            --accent-dim: #145fb5;
+            --accent-glow: rgba(31, 122, 224, 0.25);
+            --tram: #d97120;
+            --trolley: #8a44d6;
+            --bus: #dd3f5e;
+            --ok: #159a6c;
+
+            --header-1: #ffffff;
+            --header-2: #eef1f6;
+            --tint-a: rgba(16,24,40,0.035);
+            --tint-b: rgba(16,24,40,0.05);
+            --tint-c: rgba(16,24,40,0.07);
+            --tint-border: rgba(16,24,40,0.18);
+
+            --marker-bg: #ffffff;
+            --marker-border: #8895a8;
+            --marker-text: #16202f;
+            --marker-ring: #ffffff;
+
+            --popup-bg: #ffffff;
+            --popup-text: #16202f;
+            --popup-border: rgba(16,24,40,0.1);
+
+            --stop-idle: #b7c0cd;
+            --shadow-soft: 0 4px 14px rgba(16,24,40,0.18);
+        }
+
+        * { box-sizing: border-box; }
+
+        body, html { margin: 0; padding: 0; height: 100%; height: 100dvh; overflow: hidden; overscroll-behavior: none; font-family: 'Inter', 'Segoe UI', sans-serif; background: var(--bg-deep); color: var(--text); transition: background 0.25s ease, color 0.25s ease; -webkit-tap-highlight-color: transparent; }
+
+        h1,h2,h3,h4, .panel-header h3, .type-header, .tab-btn, .stats-title, .filter-title {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+        }
+
+        #map { height: 100vh; height: 100dvh; width: calc(100% - 380px); position: absolute; left: 0; top: 0; }
+
+        /* Темна карта без зовнішніх сервісів і без API-ключів: звичайні OSM-тайли,
+           інвертовані через CSS-фільтр. Фільтр висить лише на шарі тайлів
+           (.leaflet-tile-pane), тому маркери/попапи/панель залишаються нормальних кольорів. */
+        #map.map-dark .leaflet-tile-pane {
+            filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.92) saturate(0.85);
+        }
+
+        #side-panel {
+            position: absolute; top: 0; right: 0; width: 380px; height: 100vh; height: 100dvh; z-index: 1000;
+            background: var(--panel-glass);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-left: 1px solid var(--line);
+            box-shadow: -18px 0 40px rgba(0,0,0,0.35);
+            display: flex; flex-direction: column;
+            transition: background 0.25s ease;
+        }
+
+        .panel-header {
+            padding: 16px 16px 12px;
+            background: linear-gradient(150deg, var(--header-1), var(--header-2));
+            border-bottom: 1px solid var(--line);
+            position: relative;
+        }
+        .panel-header::after {
+            content: "";
+            position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+            background: linear-gradient(90deg, var(--accent), transparent 70%);
+            opacity: 0.7;
+        }
+        .panel-header h3 {
+            margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.2px;
+            display: flex; align-items: center; justify-content: space-between; color: var(--text);
+        }
+        .brand { display: flex; align-items: center; gap: 8px; }
+        .brand-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); flex-shrink: 0; }
+        .header-actions { display: flex; gap: 6px; }
+        .btn-header {
+            padding: 7px 10px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid var(--line);
+            border-radius: var(--radius-sm); text-decoration: none; text-align: center; letter-spacing: 0.2px;
+            transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+            display: inline-flex; align-items: center; gap: 4px; background: var(--tint-b); color: var(--text);
+        }
+        .btn-header:active { transform: scale(0.95); }
+        .btn-admin { background: rgba(255, 145, 66, 0.14); color: #d9782c; border-color: rgba(255, 145, 66, 0.3); }
+        html[data-theme="dark"] .btn-admin, :root:not([data-theme]) .btn-admin { color: #ffb27a; }
+        .btn-admin:hover { background: rgba(255, 145, 66, 0.24); }
+        .btn-map { background: rgba(58, 166, 255, 0.12); color: var(--accent-dim); border-color: rgba(58, 166, 255, 0.3); }
+        html[data-theme="dark"] .btn-map, :root:not([data-theme]) .btn-map { color: #8ec7ff; }
+        .btn-map:hover { background: rgba(58, 166, 255, 0.22); }
+        .btn-theme { font-size: 14px; padding: 7px 9px; }
+
+        .mobile-handle { display: none; }
+
+        .tab-nav { display: flex; background: var(--tint-a); border-bottom: 1px solid var(--line); padding: 6px 8px; gap: 6px; }
+        .tab-btn {
+            flex: 1; padding: 10px 8px; color: var(--text-dim); border: none; background: transparent;
+            font-weight: 600; font-size: 13px; cursor: pointer; border-radius: var(--radius-sm);
+            transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .tab-btn:hover:not(.active) { background: var(--tint-b); color: var(--text); }
+        .tab-btn.active { color: #fff; }
+        #tab0.active { background: linear-gradient(135deg, #2fa8ff, #1c7fd6); box-shadow: 0 4px 14px rgba(47, 168, 255, 0.35); }
+        #tab1.active { background: linear-gradient(135deg, #b16bff, #8a3fe0); box-shadow: 0 4px 14px rgba(177, 107, 255, 0.35); }
+
+        .panel-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+        .tab-content { padding: 14px 16px 20px; flex: 1; overflow-y: auto; display: none; }
+        .tab-content.active { display: block; }
+
+        .tab-content::-webkit-scrollbar, .checkbox-group::-webkit-scrollbar { width: 6px; }
+        .tab-content::-webkit-scrollbar-thumb, .checkbox-group::-webkit-scrollbar-thumb { background: var(--tint-border); border-radius: 4px; }
+        .tab-content::-webkit-scrollbar-track, .checkbox-group::-webkit-scrollbar-track { background: transparent; }
+
+        .forecast-panel { padding: 0; }
+        .forecast-item {
+            background: var(--panel-2); padding: 12px 14px; margin: 8px 0; border-radius: var(--radius-md);
+            border: 1px solid var(--line); border-left: 3px solid var(--accent);
+            transition: transform 0.15s ease; color: var(--text);
+        }
+        .forecast-item:hover { transform: translateX(2px); }
+
+        .global-controls { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+        .global-controls button {
+            flex: 1; padding: 9px 6px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+            background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm);
+            transition: all 0.15s ease;
+        }
+        .global-controls button:hover { background: rgba(58, 166, 255, 0.12); border-color: var(--accent-dim); color: var(--accent-dim); }
+        .global-controls button.active {
+            background: linear-gradient(135deg, #2fa8ff, #1c7fd6); border-color: transparent; color: #fff;
+            box-shadow: 0 3px 10px rgba(47, 168, 255, 0.3);
+        }
+
+        .filter-row, .stats-panel {
+            margin: 12px 0; background: var(--panel-2); padding: 14px; border-radius: var(--radius-md);
+            border: 1px solid var(--line);
+        }
+        .filter-title { font-weight: 600; margin-bottom: 10px; font-size: 13px; color: var(--text); letter-spacing: 0.2px; }
+        .checkbox-group { display: flex; flex-direction: column; gap: 4px; max-height: 280px; overflow-y: auto; }
+
+        .filter-option {
+            display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text-dim);
+            padding: 7px 8px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.15s ease;
+        }
+        .filter-option:hover { background: var(--tint-b); color: var(--text); }
+        .filter-option input[type="checkbox"] {
+            appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border-radius: 5px;
+            border: 1.5px solid var(--tint-border); background: var(--tint-a); cursor: pointer;
+            display: inline-grid; place-content: center; flex-shrink: 0; transition: all 0.15s ease;
+        }
+        .filter-option input[type="checkbox"]::before {
+            content: ""; width: 9px; height: 9px; transform: scale(0); border-radius: 2px;
+            background: var(--accent); transition: transform 0.12s ease;
+        }
+        .filter-option input[type="checkbox"]:checked { border-color: var(--accent); }
+        .filter-option input[type="checkbox"]:checked::before { transform: scale(1); }
+        small { color: var(--text-dim); }
+
+        .btn-reset {
+            margin-top: 10px; width: 100%; padding: 9px; background: var(--tint-b); color: var(--text-dim);
+            border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; font-weight: 600;
+            font-size: 12.5px; transition: all 0.15s ease;
+        }
+        .btn-reset:hover { background: rgba(255, 93, 122, 0.12); border-color: rgba(255, 93, 122, 0.3); color: #e0546e; }
+
+        .btn-detail {
+            width: 100%; padding: 11px; margin: 4px 0 12px; cursor: pointer; font-weight: 600; font-size: 13px;
+            background: linear-gradient(135deg, #2fa8ff, #1c7fd6); color: white; border: none; border-radius: var(--radius-md);
+            box-shadow: 0 4px 14px rgba(47, 168, 255, 0.3); transition: transform 0.15s ease;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn-detail:hover { transform: translateY(-1px); }
+        .btn-detail:active { transform: translateY(0); }
+
+        .type-header {
+            font-weight: 700; padding: 8px 12px; margin-top: 16px; margin-bottom: 4px;
+            border-radius: var(--radius-sm); font-size: 12.5px; letter-spacing: 0.3px;
+            display: flex; align-items: center; gap: 8px; color: var(--text);
+            background: var(--tint-a); border-left: 3px solid transparent;
+        }
+        .route-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 6px; margin-top: 6px; margin-bottom: 4px; }
+        .route-btn {
+            padding: 9px 2px; border: 1px solid var(--line); border-radius: var(--radius-sm); text-align: center;
+            cursor: pointer; font-size: 12px; font-weight: 700; background: var(--panel-2); color: var(--text-dim);
+            transition: all 0.15s ease; position: relative;
+        }
+        .route-btn:hover { background: var(--tint-c); color: var(--text); transform: translateY(-1px); }
+        .route-btn.active {
+            background: linear-gradient(135deg, #2fa8ff, #1c7fd6); color: white; border-color: transparent;
+            box-shadow: 0 3px 10px rgba(52, 152, 219, 0.4);
+        }
+        .route-btn.online::after {
+            content: ""; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%;
+            background: var(--ok); box-shadow: 0 0 6px var(--ok);
+        }
+
+        .stats-title { font-weight: 700; margin-bottom: 8px; font-size: 13px; }
+
+        /* mobile bottom-sheet toggle button */
+        #mobile-panel-toggle { display: none; }
+
+        /* ===== leaflet popup theming ===== */
+        .leaflet-popup-content-wrapper {
+            background: var(--popup-bg) !important; color: var(--popup-text) !important;
+            border-radius: var(--radius-md) !important; border: 1px solid var(--popup-border) !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3) !important;
+        }
+        .leaflet-popup-tip { background: var(--popup-bg) !important; border: 1px solid var(--popup-border) !important; box-shadow: none !important; }
+        .leaflet-popup-content { margin: 12px 14px !important; color: var(--popup-text) !important; }
+        .leaflet-popup-close-button { color: var(--text-dim) !important; }
+        .leaflet-popup-close-button:hover { color: var(--text) !important; }
+        .leaflet-bar a { background: var(--panel) !important; color: var(--text) !important; border-color: var(--line) !important; }
+
+        /* ===== vehicle markers: default (arrow) style ===== */
+        .vehicle-marker-wrapper { position: relative; width: 145px; height: 72px; }
+        .vehicle-arrow-box {
+            position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%);
+            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; z-index: 2;
+            text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+        .vehicle-title-box {
+            position: absolute; left: 50%; top: 68%; transform: translateX(-50%); background: var(--marker-bg);
+            border: 1px solid var(--marker-border); border-radius: var(--radius-sm); padding: 3px 9px;
+            font-size: 10.7px; font-weight: 700; color: var(--marker-text); white-space: nowrap;
+            box-shadow: var(--shadow-soft); display: flex; align-items: center; gap: 4px;
+        }
+        .vehicle-marker-wrapper.low-floor .vehicle-title-box { border: 2px solid var(--ok) !important; }
+
+        /* ===== vehicle markers: alternate (badge/icon) style ===== */
+        .vehicle-marker-wrapper.vehicle-alt { width: 130px; height: 76px; }
+        .vehicle-alt-badge {
+            position: absolute; left: 50%; top: 26%; transform: translate(-50%, -50%);
+            width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 0 3px var(--marker-ring); z-index: 2;
+        }
+        .vehicle-alt-icon { font-size: 18px; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4)); }
+        .vehicle-alt-arrow {
+            position: absolute; top: -7px; right: -7px; width: 17px; height: 17px; border-radius: 50%;
+            background: var(--marker-bg); color: var(--marker-text); font-size: 10px; display: flex; align-items: center; justify-content: center;
+            border: 1.5px solid var(--marker-ring); transform-origin: center;
+        }
+        .vehicle-marker-wrapper.vehicle-alt .vehicle-title-box { top: 66%; }
+
+        /* ID трекера під номером — лише для ще не ідентифікованих бортів */
+        .vehicle-id-sub {
+            position: absolute; left: 50%; top: calc(68% + 24px); transform: translateX(-50%);
+            font-size: 9px; font-weight: 600; color: var(--text-dim); white-space: nowrap;
+            background: var(--marker-bg); border: 1px solid var(--marker-border);
+            border-radius: 6px; padding: 0 5px; line-height: 14px;
+        }
+        .vehicle-marker-wrapper.vehicle-alt .vehicle-id-sub { top: calc(66% + 24px); }
+
+        /* ===== підсвітка за напрямком схеми (Туди/Назад), як для зупинок ===== */
+        .vehicle-marker-wrapper.dir-0 .vehicle-arrow-box { box-shadow: 0 0 0 3px #3498db, 0 0 6px #3498db; border-radius: 9px; background: rgba(0,0,0,0.15); }
+        .vehicle-marker-wrapper.dir-0 .vehicle-alt-badge { box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 0 3px #3498db; }
+        .vehicle-marker-wrapper.dir-1 .vehicle-arrow-box { box-shadow: 0 0 0 3px #e74c3c, 0 0 6px #e74c3c; border-radius: 9px; background: rgba(0,0,0,0.15); }
+        .vehicle-marker-wrapper.dir-1 .vehicle-alt-badge { box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 0 3px #e74c3c; }
+        .vehicle-marker-wrapper.multi .vehicle-arrow-box { box-shadow: 0 0 0 3px var(--rc), 0 0 6px var(--rc) !important; border-radius: 9px; }
+        .vehicle-marker-wrapper.multi .vehicle-alt-badge { box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 0 3px var(--rc) !important; }
+        .vehicle-marker-wrapper.dir-dim { opacity: 0.32; }
+        .vehicle-marker-wrapper.dir-dim:hover { opacity: 0.85; }
+
+        /* ===== off-route (поза маршрутом) — сіре, приглушене позначення ===== */
+        .vehicle-marker-wrapper.off-route .vehicle-title-box { border: 2px dashed #7f8c8d !important; background: #7f8c8d33; color: #ccc !important; }
+        .vehicle-marker-wrapper.off-route .vehicle-arrow-box { filter: grayscale(1) opacity(0.8); }
+        .vehicle-marker-wrapper.off-route .vehicle-alt-badge { filter: grayscale(1) opacity(0.85); box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 0 3px #7f8c8d !important; }
+        .off-route-flag {
+            position: absolute; top: -6px; left: -6px; width: 16px; height: 16px; border-radius: 50%;
+            background: #7f8c8d; color: #fff; font-size: 10px; display: flex; align-items: center; justify-content: center;
+            border: 1.5px solid #fff; z-index: 3;
+        }
+        /* Низька підлога позначається зеленою рамкою title-box (.low-floor вище) —
+           окрема іконка не потрібна. */
+
+        /* ================= MOBILE ================= */
+        @media (max-width: 820px) {
+            #map { width: 100%; }
+
+            /* Шторка знизу: керується через --sheet-h (частка висоти екрана),
+               яку виставляє JS — і по кліку на ручку/хедер (snap-стани),
+               і "наживо" під час свайпу пальцем (без анімації, для чутливості). */
+            #side-panel {
+                top: auto; bottom: 0; left: 0; right: 0; width: 100%;
+                height: var(--sheet-h, 68px);
+                max-height: 92dvh;
+                border-left: none; border-top: 1px solid var(--line);
+                border-radius: 20px 20px 0 0;
+                box-shadow: 0 -14px 40px rgba(0,0,0,0.4);
+                padding-bottom: env(safe-area-inset-bottom);
+                display: flex; flex-direction: column;
+                transition: height 0.28s cubic-bezier(0.22, 1, 0.36, 1), background 0.25s ease;
+            }
+            #side-panel.dragging { transition: none; }
+
+            /* touch-action:none лежить ТІЛЬКИ на ручці й хедері (зона свайпу) —
+               якщо повісити його на весь #side-panel, це "з'їсть" прокрутку
+               всередині вкладок (touch-action на дочірніх елементах перетинається
+               з батьківським, а не перекриває його). */
+            .mobile-handle {
+                display: flex; justify-content: center; align-items: center; padding: 9px 0 4px; cursor: grab;
+                flex-shrink: 0; touch-action: none;
+            }
+            .mobile-handle span { width: 38px; height: 4px; border-radius: 3px; background: var(--tint-border); }
+
+            .panel-header { padding: 2px 16px 10px; cursor: pointer; flex-shrink: 0; touch-action: none; }
+
+            .panel-body {
+                flex: 1; min-height: 0; opacity: 0; overflow: hidden;
+                transition: opacity 0.18s ease;
+            }
+            #side-panel.expanded .panel-body { opacity: 1; display: flex; }
+            #side-panel .tab-content { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+
+            #mobile-panel-toggle {
+                display: flex; align-items: center; justify-content: center; gap: 6px;
+                position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 1001;
+                width: auto; padding: 13px 18px; border-radius: 999px; border: none; cursor: pointer;
+                background: linear-gradient(135deg, #2fa8ff, #1c7fd6); color: #fff; font-weight: 700; font-size: 13px;
+                box-shadow: 0 8px 22px rgba(47, 168, 255, 0.45);
+            }
+            /* Видимість кнопки "Маршрути" при розгорнутій шторці керується з JS
+               (inline style), бо в розмітці кнопка йде ПЕРЕД #side-panel, і
+               CSS-селектор через сусідство тут не спрацював би. */
+
+            /* Зум-контроли Leaflet переносимо в верхній правий кут з відступом під
+               safe-area, щоб вони ніколи не перекривались шторкою чи кнопкою "Маршрути". */
+            .leaflet-top.leaflet-right {
+                top: calc(12px + env(safe-area-inset-top));
+            }
+            .leaflet-control-zoom a { width: 38px !important; height: 38px !important; line-height: 38px !important; font-size: 18px !important; }
+            /* Шторка внизу перекриває весь низ екрана, тому атрибуцію (яку не можна
+               просто ховати — це умова використання тайлів OSM) JS переносить у
+               вільний верхній лівий кут і тут вона стає компактнішою. */
+            .leaflet-control-attribution {
+                font-size: 9px !important; padding: 1px 5px !important; line-height: 1.3 !important;
+            }
+            .leaflet-top.leaflet-left { top: calc(12px + env(safe-area-inset-top)); }
+
+            .route-grid { grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); }
+            .btn-header { padding: 9px 11px; font-size: 12px; }
+            .btn-header span.btn-label { display: none; }
+
+            .vehicle-marker-wrapper { width: 118px; height: 60px; }
+            .vehicle-title-box { font-size: 9.5px; padding: 2px 7px; }
+            .vehicle-arrow-box { font-size: 20px; }
+
+            .leaflet-popup { margin-bottom: 8px; }
+            .leaflet-popup-content-wrapper { max-width: min(78vw, 300px); }
+            .leaflet-popup-content { font-size: 13px; }
+        }
+
+        @media (min-width: 821px) {
+            #mobile-panel-toggle { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+
+<button id="mobile-panel-toggle" onclick="togglePanelMobile()">☰ Маршрути та фільтри</button>
+
+<div id="side-panel">
+    <div class="mobile-handle"><span></span></div>
+    <div class="panel-header">
+        <h3>
+            <div class="brand"><span class="brand-dot"></span>Транспорт Львова</div>
+            <div class="header-actions">
+                <button onclick="event.stopPropagation(); toggleTheme()" id="theme-toggle" class="btn-header btn-theme" title="Тема">🌙</button>
+                <a href="admin.html" target="_blank" class="btn-header btn-admin" onclick="event.stopPropagation()">🛠️<span class="btn-label"> Статистика</span></a>
+                <button onclick="event.stopPropagation(); toggleMap()" class="btn-header btn-map">🗺️<span class="btn-label"> Карта</span></button>
+            </div>
+        </h3>
+    </div>
+
+  <div class="panel-body">
+    <div class="tab-nav">
+        <button onclick="switchTab(0)" class="tab-btn active" id="tab0">🚏 Маршрути</button>
+        <button onclick="switchTab(1)" class="tab-btn" id="tab1">⚙️ Сортування</button>
+    </div>
+
+    <!-- TAB 0: Маршрути -->
+    <div id="tab-content-0" class="tab-content active">
+        <button onclick="toggleStats()" class="btn-detail">
+            📊 Детальніше (статистика + моделі)
+        </button>
+
+        <div id="forecast-content" class="forecast-panel"></div>
+
+        <div id="stats-panel" class="stats-panel" style="display:none;">
+            <div class="stats-title">Статистика активних ТЗ</div>
+            <div id="stats-content" style="font-size:13px; line-height:1.6; margin-bottom:12px;"></div>
+            <div class="filter-title">Фільтр по моделі:</div>
+            <div id="model-filters" class="checkbox-group"></div>
+        </div>
+
+        <div class="filter-row">
+            <div class="filter-title">Фільтри характеристик:</div>
+            <div class="checkbox-group">
+                <label class="filter-option"><input type="checkbox" id="filter-ac-full" onchange="applyFilters()"> ❄️ Кондиціонер</label>
+                <label class="filter-option"><input type="checkbox" id="filter-ac-one" onchange="applyFilters()"> ❄️½ Малий кондиціонер</label>
+                <label class="filter-option"><input type="checkbox" id="filter-vent" onchange="applyFilters()"> 🌬️ Вентиляція</label>
+                <label class="filter-option"><input type="checkbox" id="filter-low" onchange="applyFilters()"> ♿ Низька підлога</label>
+            </div>
+            <button onclick="resetFilters()" class="btn-reset">Скинути всі фільтри</button>
+        </div>
+
+        <div class="filter-row">
+            <div class="filter-title">🗺️ Схема маршрутів на карті</div>
+            <label class="filter-option">
+                <input type="checkbox" id="show-route-lines" onchange="toggleRouteLinesDisplay()">
+                Малювати лінії маршрутів
+            </label>
+            <small style="display:block; margin-top:6px;">
+                Вимкнено за замовчуванням — так вибір великої кількості маршрутів (наприклад «Увімкнути всі») не навантажує карту.
+            </small>
+        </div>
+
+        <div class="global-controls">
+            <button onclick="massSelect(true)">Увімкнути всі</button>
+            <button onclick="massSelect(false)">Вимкнути всі</button>
+        </div>
+
+        <div class="type-header" style="border-left-color: var(--tram);">🚃 Трамваї</div>
+        <div id="grid-tram" class="route-grid"></div>
+        <div class="type-header" style="border-left-color: var(--trolley);">🚎 Тролейбуси</div>
+        <div id="grid-trolley" class="route-grid"></div>
+        <div class="type-header" style="border-left-color: var(--bus);">🚌 Автобуси</div>
+        <div id="grid-bus" class="route-grid"></div>
+    </div>
+
+    <div id="tab-content-1" class="tab-content">
+        <div class="filter-row">
+            <div class="filter-title">🚐 Вигляд техніки на карті</div>
+            <label class="filter-option">
+                <input type="checkbox" id="alt-icons" onchange="toggleIconStyle()">
+                Іконки-бейджі замість стрілок
+            </label>
+            <small style="display:block; margin-top:8px;">
+                Альтернативний вигляд маркерів: кругла іконка типу транспорту зі стрілкою напрямку.
+            </small>
+        </div>
+
+        <div class="filter-row">
+            <div class="filter-title">📍 Відображення зупинок</div>
+            <label class="filter-option">
+                <input type="checkbox" id="hide-inactive-stops" checked onchange="applyStopVisibility()">
+                Приховувати неактивні зупинки
+            </label>
+            <small style="display:block; margin-top:8px;">
+                Коли увімкнено — на карті залишаються тільки зупинки вибраних маршрутів.
+            </small>
+        </div>
+
+        <div class="filter-row">
+            <div class="filter-title">➡️ Напрямок схеми</div>
+            <div class="global-controls">
+                <button onclick="setDirection('0')" id="dir-0">Туди (0)</button>
+                <button onclick="setDirection('1')" id="dir-1">Назад (1)</button>
+                <button onclick="setDirection('all')" id="dir-all" class="active">Обидва</button>
+            </div>
+            <small style="display:block; margin-top:8px;">
+                Впливає на підсвічування зупинок та видимість схеми.
+            </small>
+        </div>
+
+        <button onclick="resetAllFiltersAndDirections()" class="btn-reset" style="margin-top:15px; background: rgba(255, 93, 122, 0.12); border-color: rgba(255, 93, 122, 0.3); color: #ff8fa3;">
+            Скинути все
+        </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const db = getDatabase(initializeApp({ databaseURL: "https://lviv-transport-web-default-rtdb.firebaseio.com" }));
+
+    // ====================== vehicle_mapping: підтримка нового формату ======================
+    // vehicle_mapping/{id} тепер може бути або старим плоским записом [p,l,c,m],
+    // або новим — масивом об'єктів {p,l,c,m,from}, де 'from' — дата, з якої цей
+    // борт закріплений за трекером. Тут завжди беремо запис, що діє "зараз".
+    function todayStr() {
+        return new Date().toISOString().split('T')[0];
+    }
+
+    function normalizeMappingRecords(records) {
+        if (Array.isArray(records) && records.length && records[0] && typeof records[0] === 'object' && !Array.isArray(records[0])) {
+            return records.map(r => ({
+                p: (r && typeof r.p === 'string') ? r.p : '',
+                l: (r && r.l != null) ? r.l : 0,
+                c: (r && r.c != null) ? r.c : 0,
+                m: (r && typeof r.m === 'string') ? r.m : '',
+                from: (r && typeof r.from === 'string') ? r.from : ''
+            }));
+        }
+        if (Array.isArray(records) && records.length) {
+            return [{
+                p: (typeof records[0] === 'string') ? records[0] : '',
+                l: records[1] != null ? records[1] : 0,
+                c: records[2] != null ? records[2] : 0,
+                m: (typeof records[3] === 'string') ? records[3] : '',
+                from: ''
+            }];
+        }
+        return [];
+    }
+
+    // Запис, що діє сьогодні (найпізніша 'from' <= сьогодні), або перший заповнений
+    function getCurrentMappingRecord(id) {
+        const list = normalizeMappingRecords(window.mapping?.[id]);
+        const candidates = list.filter(s => s.p && (!s.from || s.from <= todayStr()));
+        if (candidates.length) {
+            candidates.sort((a, b) => (b.from || '').localeCompare(a.from || ''));
+            return candidates[0];
+        }
+        return list.find(s => s.p) || { p: '', l: 0, c: 0, m: '', from: '' };
+    }
+    // =========================================================================================
+
+    // Один-єдиний, завжди безкоштовний тайл-шар OSM — і для світлої, і для темної
+    // теми. "Темність" тепер — це CSS-фільтр (invert) на .leaflet-tile-pane, а не
+    // окремий сервіс. Так карта більше ніколи не впирається в чужий API-ключ.
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+    const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+    const stopsCache = {};
+    const map = L.map('map', { center: [49.84, 24.03], zoom: 13, zoomControl: false });
+    L.control.zoom({ position: 'topright' }).addTo(map);
+    osm.addTo(map);
+
+    // На телефоні нижня шторка перекриває весь низ карти, тому стандартна
+    // атрибуція (bottomright) опинилась би позаду неї. Переносимо її у вільний
+    // верхній лівий кут — ховати зовсім не можна, це умова використання тайлів OSM.
+    function placeAttribution() {
+        map.attributionControl.setPosition(window.innerWidth <= 820 ? 'topleft' : 'bottomright');
+    }
+    placeAttribution();
+    window.addEventListener('resize', placeAttribution);
+
+    // ====================== теми: світла / темна ======================
+    const mapEl = document.getElementById('map');
+    let currentBase = 'osm';        // 'osm' | 'sat'
+    let lastNonSatTheme = 'dark';   // 'light' | 'dark' — яку тему показати, коли повернемось з супутника
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        const btn = document.getElementById('theme-toggle');
+        if (btn) btn.textContent = theme === 'light' ? '🌙' : '☀️';
+
+        lastNonSatTheme = theme;
+        if (currentBase !== 'sat') {
+            mapEl.classList.toggle('map-dark', theme === 'dark');
+        }
+
+        try { localStorage.setItem('lvivTransportTheme', theme); } catch (e) {}
+    }
+
+    window.toggleTheme = () => {
+        const current = document.documentElement.getAttribute('data-theme') || 'dark';
+        applyTheme(current === 'dark' ? 'light' : 'dark');
+    };
+
+    window.toggleMap = () => {
+        if (currentBase === 'sat') {
+            map.removeLayer(sat);
+            osm.addTo(map);
+            mapEl.classList.toggle('map-dark', lastNonSatTheme === 'dark');
+            currentBase = 'osm';
+        } else {
+            map.removeLayer(osm);
+            mapEl.classList.remove('map-dark'); // супутникові знімки не інвертуємо
+            sat.addTo(map);
+            currentBase = 'sat';
+        }
+    };
+
+    let savedTheme = 'dark';
+    try { savedTheme = localStorage.getItem('lvivTransportTheme') || 'dark'; } catch (e) {}
+    applyTheme(savedTheme);
+    // ====================================================================
+
+    let markers = {}, routeLines = {}, activeRoutes = new Set(), shapesData = {}, existingButtons = new Set();
+    let stopsDict = {};
+    let stopMarkers = {};
+    let currentForecastStop = null;
+    let forecastInterval = null;
+    let showStats = false;
+    let selectedModels = new Set();
+    let renderTimeout = null;
+
+    // ==================== геометрія маршруту для напрямку/поза-маршрутом ====================
+    // Використовуємо ті самі routes/{name}_line.json, що й для малювання ліній на карті:
+    // features[0] = лінія напрямку "Туди" (0), features[1] = "Назад" (1).
+    // Порівнюючи позицію ТЗ з цими лініями, визначаємо (а) до якого напрямку він ближче,
+    // (б) чи не відхилився він далі OFF_ROUTE_THRESHOLD_M від обох ліній одразу.
+    const OFF_ROUTE_THRESHOLD_M = 100;
+    const routeGeomCache = {}; // routeKey -> { dirs: [[ [lat,lng], ... ], [ [lat,lng], ... ]] } | 'loading' | 'failed'
+
+    function metersPerDeg(refLatDeg) {
+        const refLat = refLatDeg * Math.PI / 180;
+        return { mx: 111320 * Math.cos(refLat), my: 111320 };
+    }
+
+    function pointSegmentDistanceM(lat, lon, lat1, lon1, lat2, lon2) {
+        const { mx, my } = metersPerDeg((lat1 + lat2) / 2);
+        const px = lon * mx, py = lat * my;
+        const x1 = lon1 * mx, y1 = lat1 * my;
+        const x2 = lon2 * mx, y2 = lat2 * my;
+        const dx = x2 - x1, dy = y2 - y1;
+        if (dx === 0 && dy === 0) return Math.hypot(px - x1, py - y1);
+        let t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
+    function bearingBetween(lat1, lon1, lat2, lon2) {
+        const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
+        const φ1 = toRad(lat1), φ2 = toRad(lat2), Δλ = toRad(lon2 - lon1);
+        const y = Math.sin(Δλ) * Math.cos(φ2);
+        const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+        return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    }
+
+    // 1 = курс ТЗ співпадає з напрямком лінії, -1 = протилежний, 0 = впоперек
+    function bearingAlignment(vehicleBearing, segBearing) {
+        const diff = Math.abs(((vehicleBearing - segBearing + 540) % 360) - 180);
+        return Math.cos(diff * Math.PI / 180);
+    }
+
+    // Відстань до полілінії + компасний напрям найближчого відрізка (для дизамбігуації
+    // на ділянках, де "туди" й "назад" йдуть по одній вулиці й майже накладаються).
+    const ROUTE_PALETTE=['#e6194b','#3cb44b','#4363d8','#f58231','#911eb4','#00a3a3','#b8960b','#f032e6','#795548','#00bcd4'];
+    const routeColorMap={}; let lastRouteSig='';
+    function routeColor(routeKey,i){
+        if(activeRoutes.size<=1) return i===0?'#3498db':'#e74c3c';
+        Object.keys(routeColorMap).forEach(k=>{ if(!activeRoutes.has(k)) delete routeColorMap[k]; });
+        if(!routeColorMap[routeKey]){
+            const used=new Set(Object.values(routeColorMap));
+            routeColorMap[routeKey]=ROUTE_PALETTE.find(c=>!used.has(c))||ROUTE_PALETTE[Object.keys(routeColorMap).length%ROUTE_PALETTE.length];
+        }
+        return routeColorMap[routeKey];
+    }
+    function recolorLines(){
+        Object.keys(routeLines).forEach(k=>{
+            const p=k.lastIndexOf('_'), rk=k.slice(0,p), i=+k.slice(p+1);
+            if(routeLines[k].setStyle) routeLines[k].setStyle({color:routeColor(rk,i),dashArray:(activeRoutes.size>1&&i===1)?'10 8':null});
+        });
+    }
+    function matchToPolyline(lat, lon, points) {
+        if (!points || points.length < 2) return { distance: Infinity, segBearing: null };
+        let minD = Infinity, bestBearing = null;
+        for (let i = 0; i < points.length - 1; i++) {
+            const [lat1, lon1] = points[i];
+            const [lat2, lon2] = points[i + 1];
+            const d = pointSegmentDistanceM(lat, lon, lat1, lon1, lat2, lon2);
+            if (d < minD) { minD = d; bestBearing = bearingBetween(lat1, lon1, lat2, lon2); }
+        }
+        return { distance: minD, segBearing: bestBearing };
+    }
+
+    function downsample(points, maxPoints) {
+        if (points.length <= maxPoints) return points;
+        const step = Math.ceil(points.length / maxPoints);
+        return points.filter((_, i) => i % step === 0);
+    }
+
+    // Ліниво завантажує й кешує геометрію маршруту; коли дані прийдуть — тригерить
+    // перемальовку, щоб ТЗ цього маршруту одразу отримали напрямок/off-route статус.
+    function ensureRouteGeometry(routeKey, safeInternal) {
+        if (routeGeomCache[routeKey]) return;
+        routeGeomCache[routeKey] = 'loading';
+        fetch(`routes/${safeInternal}_line.json?t=${Date.now()}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data && Array.isArray(data.features) && data.features.length) {
+                    const dirs = data.features.map(f =>
+                        downsample(f.geometry.coordinates.map(c => [c[1], c[0]]), 300)
+                    );
+                    routeGeomCache[routeKey] = { dirs };
+                } else {
+                    routeGeomCache[routeKey] = 'failed';
+                }
+                if (window.lastV && typeof render === 'function') render(window.lastV);
+            })
+            .catch(() => { routeGeomCache[routeKey] = 'failed'; });
+    }
+
+    // Повертає { offRoute, dir } на основі найближчої з ліній напрямків маршруту.
+    // dir: 0 ("Туди") / 1 ("Назад") / null, якщо геометрія ще не завантажена.
+    function getRouteMatch(routeKey, safeInternal, lat, lng, vehicleBearing, speedKmh) {
+        ensureRouteGeometry(routeKey, safeInternal);
+        const geom = routeGeomCache[routeKey];
+        if (!geom || geom === 'loading' || geom === 'failed' || !geom.dirs) {
+            return { offRoute: false, dir: null };
+        }
+        const matches = geom.dirs.map(pts => matchToPolyline(lat, lng, pts));
+        const distances = matches.map(m => m.distance);
+        const minDist = Math.min(...distances);
+        if (!isFinite(minDist)) return { offRoute: false, dir: null };
+
+        let dir = distances.indexOf(minDist); // за замовчуванням — просто найближча лінія
+
+        // На ділянках, де "туди" й "назад" йдуть по одній вулиці (лінії майже
+        // накладаються), сира відстань — по суті шум від GPS. Якщо ТЗ реально рухається
+        // (є швидкість і курс), надійніше зорієнтуватись на те, куди він фактично їде.
+        if (matches.length === 2 && typeof speedKmh === 'number' && speedKmh > 5 && typeof vehicleBearing === 'number') {
+            const distDiff = Math.abs(distances[0] - distances[1]);
+            if (distDiff < 40) {
+                const align0 = matches[0].segBearing !== null ? bearingAlignment(vehicleBearing, matches[0].segBearing) : -Infinity;
+                const align1 = matches[1].segBearing !== null ? bearingAlignment(vehicleBearing, matches[1].segBearing) : -Infinity;
+                dir = align0 >= align1 ? 0 : 1;
+            }
+        }
+
+        return { offRoute: minDist > OFF_ROUTE_THRESHOLD_M, dir };
+    }
+    // ==========================================================================================
+    let allStops = {}; // { "id": { lat, lng, name, marker } }
+    let currentDirectionFilter = 'all'; // 'all', '0', '1'
+    let useAltIcons = false;
+    window.showRouteLines = false;
+
+    // ====================== мобільна шторка знизу: свайп + snap-точки ======================
+    // Раніше шторка мала лише on/off через max-height CSS-transition — на телефоні це
+    // відчувалось "смикано" й не давало підняти її пальцем. Тепер висота шторки — це
+    // CSS-змінна --sheet-h, яку можна як перемикати кліком (з анімацією), так і тягнути
+    // пальцем "наживо" (без анімації), зі snap до найближчого стану при відпусканні.
+    (function initMobileSheet() {
+        const sheet = document.getElementById('side-panel');
+        const handle = document.querySelector('.mobile-handle');
+        const header = document.querySelector('.panel-header');
+        const toggleBtn = document.getElementById('mobile-panel-toggle');
+        if (!sheet || !handle || !header) return;
+
+        const EXPANDED_FRACTION = 0.74; // яку частку висоти екрана займає розгорнута шторка
+        const DRAG_TAP_THRESHOLD = 8;   // px — менше цього вважаємо тапом, а не свайпом
+        let state = 'collapsed';        // 'collapsed' | 'expanded'
+        let dragging = false, movedEnough = false, dragStartY = 0, dragStartH = 0;
+
+        const isMobile = () => window.innerWidth <= 820;
+        const viewportH = () => (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+        const collapsedH = () => handle.offsetHeight + header.offsetHeight;
+        const expandedH = () => Math.min(viewportH() * EXPANDED_FRACTION, viewportH() * 0.92);
+        const clampH = (h) => Math.max(collapsedH(), Math.min(h, expandedH()));
+
+        function setState(next) {
+            state = next;
+            sheet.classList.toggle('expanded', state === 'expanded');
+            sheet.style.setProperty('--sheet-h', (state === 'expanded' ? expandedH() : collapsedH()) + 'px');
+            if (toggleBtn) toggleBtn.style.display = (state === 'expanded' && isMobile()) ? 'none' : '';
+        }
+
+        window.togglePanelMobile = () => {
+            if (!isMobile()) return;
+            setState(state === 'expanded' ? 'collapsed' : 'expanded');
+        };
+
+        function dragStart(e) {
+            if (!isMobile()) return;
+            if (e.target.closest && e.target.closest('.header-actions')) return; // не чіпаємо тапи по кнопках хедера
+            dragging = true; movedEnough = false;
+            sheet.classList.add('dragging');
+            dragStartY = e.touches ? e.touches[0].clientY : e.clientY;
+            dragStartH = sheet.getBoundingClientRect().height;
+        }
+        function dragMove(e) {
+            if (!dragging) return;
+            const y = e.touches ? e.touches[0].clientY : e.clientY;
+            const delta = dragStartY - y; // вгору = позитивне значення
+            if (Math.abs(delta) > DRAG_TAP_THRESHOLD) movedEnough = true;
+            if (movedEnough) {
+                sheet.style.setProperty('--sheet-h', clampH(dragStartH + delta) + 'px');
+                e.preventDefault();
+            }
+        }
+        // Після touchend браузер зазвичай ще шле "примарний" click по тій самій точці —
+        // без цього прапорця тап на ручці/хедері перемикав би стан двічі (відкрив і одразу закрив).
+        let suppressNextClick = false;
+
+        function dragEnd() {
+            if (!dragging) return;
+            dragging = false;
+            sheet.classList.remove('dragging');
+            if (movedEnough) {
+                const currentH = sheet.getBoundingClientRect().height;
+                const mid = (collapsedH() + expandedH()) / 2;
+                setState(currentH > mid ? 'expanded' : 'collapsed');
+            } else {
+                window.togglePanelMobile(); // це був тап, а не свайп
+            }
+            suppressNextClick = true;
+            setTimeout(() => { suppressNextClick = false; }, 400);
+        }
+
+        [handle, header].forEach(el => {
+            el.addEventListener('touchstart', dragStart, { passive: true });
+            el.addEventListener('touchmove', dragMove, { passive: false });
+            el.addEventListener('touchend', dragEnd);
+            el.addEventListener('touchcancel', dragEnd);
+            el.addEventListener('click', (e) => {
+                if (suppressNextClick) return; // цей клік уже відпрацьовано через touch
+                if (!isMobile() || e.target.closest('.header-actions')) return;
+                window.togglePanelMobile();
+            });
+        });
+
+        window.addEventListener('resize', () => setState(state));
+
+        // Розгорнута шторка перекриває майже весь екран — якщо в цей момент
+        // відкрився попап транспорту чи зупинки, його просто не буде видно.
+        map.on('popupopen', () => { if (isMobile() && state === 'expanded') setState('collapsed'); });
+
+        setState('collapsed');
+    })();
+    // =========================================================================================
+
+    window.toggleIconStyle = () => {
+        useAltIcons = document.getElementById('alt-icons').checked;
+        debouncedRender(window.lastV);
+    };
+    
+
+
+    const routeDisplayMap = {
+        'А01': '1A', 'А03': '3A', 'А05': '5А', 'А06': '6А', 'А07': '7', 'А09': '9',
+        'А10': '10', 'А11': '11', 'А12': '12', 'А14': '14', 'А15': '15', 'А16': '16',
+        'А17': '17', 'А18': '18', 'А19': '19', 'А20': '20', 'А21': '21', 'А22': '22',
+        'А23': '23', 'А25': '25', 'А27': '27', 'А29': '29', 'А31': '31', 'А32': '32',
+        'А33': '33', 'А34': '34', 'А37': '37', 'А39': '39', 'А40': '40', 'А41': '41',
+        'А43': '43', 'А45': '45', 'А46': '46', 'А47': '47А', 'А48': '48', 'А49': '49А',
+        'А51': '51', 'А52': '52', 'А53': '53', 'А55': '55', 'А56': '56', 'А57': '57',
+        'А58': '58', 'А59': '59', 'А60': '60', 'А61': '61', 'А62': '62', 'А63': '63',
+        'А67': '67', 'А80': '80', 'А84': '84', 'А92': '92', 'А99': '99', 'АТ8': 'Т8',
+        'А08а': '8A', 'А39а': '39A',
+        'Т01': '1', 'Т02': '2', 'Т03': '3', 'Т04': '4', 'Т06': '6',
+        'Т07': '7', 'Т08': '8', 'Т09': '9',
+        'Тр22': '22', 'Тр23': '23', 'Тр24': '24', 'Тр25': '25', 'Тр27': '27',
+        'Тр30': '30', 'Тр31': '31', 'Тр32': '32', 'Тр38': '38'
+    };
+
+    const allRoutes = {
+        tram: ['Т01','Т02','Т03','Т04','Т06','Т07','Т08','Т09'],
+        trolley: ['Тр22','Тр23','Тр24','Тр25','Тр27','Тр30','Тр31','Тр32','Тр38'],
+        bus: ['А01','А03','А05','А06','А07','А09','А10','А11','А12','А14','А15','А16','А17','А18','А19',
+              'А20','А21','А22','А23','А25','А27','А29','А31','А32','А33','А34','А37','А39','А40','А41',
+              'А43','А45','А46','А47','А48','А49','А51','А52','А53','А55','А56','А57','А58','А59','А60',
+              'А61','А62','А63','А67','А80','А84','А92','А99','АТ8','А08а','А39а']
+    };
+
+    function getCleanRoute(raw) { if(!raw) return ''; return raw.toString().trim(); }
+    function getDisplayName(internalName) { return routeDisplayMap[internalName] || internalName; }
+
+    function createRouteButton(type, internalName) {
+        const routeKey = `${type}-${internalName}`;
+        if (existingButtons.has(routeKey)) return;
+        const grid = document.getElementById(`grid-${type}`);
+        if (!grid) return;
+        const b = document.createElement('div');
+        b.className = 'route-btn';
+        b.id = `r-${type}-${internalName}`;
+        b.innerText = getDisplayName(internalName);
+        b.onclick = () => toggleRoute(type, internalName);
+        grid.appendChild(b);
+        existingButtons.add(routeKey);
+    }
+
+    
+    function initAllRouteButtons() {
+        Object.entries(allRoutes).forEach(([type, routes]) => {
+            routes.forEach(internalName => createRouteButton(type, internalName));
+        });
+    }
+
+async function startApp() {
+    console.log("запуск...");
+    
+    initAllStops(); 
+    initAllRouteButtons();
+    startForecastAutoUpdate();
+    
+
+}
+
+
+startApp();
+
+async function initAllStops() {
+    try {
+        if (typeof allStops !== 'undefined') {
+            Object.keys(allStops).forEach(id => { if (allStops[id].marker) map.removeLayer(allStops[id].marker); });
+        }
+        allStops = {}; 
+        
+        const response = await fetch(`routes/all_stops.json?t=${Date.now()}`);
+        const data = await response.json(); 
+        
+        data.forEach(stop => {
+            const id = String(stop.id); 
+            const marker = L.circleMarker([stop.lat, stop.lng], {
+                radius: 7, color: '#95a5a6', fillColor: '#95a5a6', fillOpacity: 0.4, weight: 2, interactive: true
+            });
+            // Свідомо НЕ додаємо .addTo(map) тут: зупинка з'являється на карті
+            // лише коли вона належить хоча б одному вибраному маршруту
+            // (керується updateVisibleStops/highlightRouteStops нижче).
+            // Раніше всі зупинки міста показувались одразу при завантаженні —
+            // це і виглядало як "неактивні зупинки, яких не мало бути".
+
+            marker.bindPopup("Завантаження...");
+            marker.on('click', async (e) => {
+                L.DomEvent.stopPropagation(e);
+                map.setView(marker.getLatLng(), 15);
+                const html = await getForecastPopupHTML(id, stop.name);
+                marker.setPopupContent(html);
+            });
+
+            allStops[id] = { ...stop, marker: marker };
+        });
+    } catch (e) { console.error("Помилка зупинок:", e); }
+}
+
+    function highlightRouteStops(activeStopMapping) {
+    const stops0 = activeStopMapping["0"] || [];
+    const stops1 = activeStopMapping["1"] || [];
+    const hideInactive = document.getElementById('hide-inactive-stops').checked;
+
+    Object.keys(allStops).forEach(id => {
+        const stopData = allStops[id];
+        if (!stopData || !stopData.marker) return;
+
+        const marker = stopData.marker;
+        
+        const inDir0 = stops0.includes(id);
+        const inDir1 = stops1.includes(id);
+        
+        let shouldShow = false;
+        if (currentDirectionFilter === '0') shouldShow = inDir0;
+        else if (currentDirectionFilter === '1') shouldShow = inDir1;
+        else shouldShow = inDir0 || inDir1;
+
+        if (hideInactive && !shouldShow) {
+            if (map.hasLayer(marker)) map.removeLayer(marker);
+        } else {
+            if (!map.hasLayer(marker)) marker.addTo(map);
+
+            let color = '#95a5a6';
+            if (shouldShow) {
+                if (currentDirectionFilter === '0') color = '#3498db';
+                else if (currentDirectionFilter === '1') color = '#e74c3c';
+                else color = inDir0 ? '#3498db' : '#e74c3c';
+            }
+
+            marker.setStyle({
+                radius: 8,
+                color: color,         
+                fillColor: color,     
+                weight: 2,           
+                opacity: 1,        
+                fillOpacity: 0.9      
+            });
+        }
+    });
+}
+    
+    async function showForecast(stopId, stopName) {
+    currentForecastStop = { id: stopId, name: stopName };
+    const content = document.getElementById('forecast-content');
+    content.innerHTML = `<p><strong>Завантаження...</strong></p>`;
+
+    try {
+        const res = await fetch(`https://gps.easyway.info/api/city/lviv/lang/ua/stop/${stopId}`);
+        const data = await res.json();
+        const routes = data?.data?.routes || [];
+
+        const grouped = {};
+        const now = Math.floor(Date.now() / 1000);
+
+        routes.forEach(r => {
+            if (!r.times || r.times.length === 0) return;
+            if (r.route_name.toString().match(/\d{3,}/)) return;
+
+            const times = r.times
+                .map(t => Math.max(0, Math.floor((t.arrival_time - now) / 60)))
+                .sort((a, b) => a - b); 
+
+            grouped[r.route_name] = {
+                direction: r.direction_name || '',
+                times: times
+            };
+        });
+
+        const sortedKeys = Object.keys(grouped).sort((a, b) => grouped[a].times[0] - grouped[b].times[0]);
+
+        let html = `<b>${stopName}</b><hr>`;
+        
+        if (sortedKeys.length === 0) {
+            html += `<span style="color:#e67e22;">Наразі немає прогнозів</span>`;
+        } else {
+            sortedKeys.forEach(name => {
+                const r = grouped[name];
+                const first = r.times[0] === 0 ? "Зараз" : r.times[0] + " хв";
+                const rest = r.times.slice(1).map(t => t + " хв").join(', ');
+
+                html += `
+                    <div class="forecast-item" style="margin-bottom: 5px; padding: 8px;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <strong>${name}</strong>
+                            <span style="color:#27ae60; font-weight:bold;">${first}</span>
+                        </div>
+                        ${r.times.length > 1 ? `<small style="color:#7f8c8d;">Наступний за: ${rest}</small>` : ''}
+                    </div>`;
+            });
+        }
+        content.innerHTML = html;
+    } catch(e) {
+        content.innerHTML = `<p style="color:red;">Помилка завантаження</p>`;
+    }
+}
+
+    function startForecastAutoUpdate() {
+    if (forecastInterval) clearInterval(forecastInterval);
+    
+    forecastInterval = setInterval(() => {
+        if (currentForecastStop) {
+            console.log("🔄 Автооновлення прогнозу для:", currentForecastStop.id);
+            showForecast(currentForecastStop.id, currentForecastStop.name);
+        }
+    }, 25000);
+}
+
+    async function getForecastPopupHTML(stopId, stopName) {
+    try {
+        const res = await fetch(`https://gps.easyway.info/api/city/lviv/lang/ua/stop/${stopId}`);
+        const data = await res.json();
+        const routes = data?.data?.routes || [];
+
+        let html = `<div style="font-size:12px;"><b>${stopName}</b><hr>`;
+        let hasForecast = false;
+
+        routes.sort((a, b) => (a.times[0]?.arrival_time || 0) - (b.times[0]?.arrival_time || 0));
+
+        routes.forEach(r => {
+            const routeNumber = parseInt(r.route_name);
+            if (isNaN(routeNumber) || routeNumber >= 100) return;
+
+            const now = Date.now() / 1000;
+            const times = r.times
+                .map(t => Math.floor((t.arrival_time - now) / 60))
+                .filter(t => t >= 0 && t <= 120);
+
+            if (times.length > 0) {
+                hasForecast = true;
+                
+                const key = r.transport_key; 
+                let icon = '🚌'; 
+                
+                if (key === 'trol') icon = '🚎';
+                else if (key === 'tram') icon = '🚃';
+                else if (key === 'marshrutka') icon = '🚐';
+                
+                html += `<div style="margin-bottom:5px;"><b>${icon} №${r.route_name}</b>: 
+                         ${times.map(t => t > 110 ? 'невідомо' : t + ' хв').join(', ')}</div>`;
+            }
+        });
+
+        if (!hasForecast) {
+            html += `<div style="color:gray; font-style:italic;">Наразі немає прогнозів</div>`;
+        }
+
+        return html + `</div>`;
+    } catch(e) { 
+        return `<div style="font-size:12px;">Помилка завантаження...</div>`; 
+    }
+}
+function getSafeFileName(internal) {
+    const map = { 
+        'Тр': 'Tr', 'Т': 'T', 'р': 'r', 
+        'А': 'A', 'а': 'a', 'М': 'M', 'м': 'm' 
+    };
+    
+    let result = internal;
+    result = result.replace('Тр', 'Tr');
+    
+    for (const key in map) {
+        result = result.split(key).join(map[key]);
+    }
+    
+    return result.replace(/[^a-zA-Z0-9]/g, '');
+}
+
+function removeRouteLines(routeKey) {
+    Object.keys(routeLines).forEach(key => {
+        if (key.startsWith(routeKey)) {
+            map.removeLayer(routeLines[key]);
+            delete routeLines[key];
+        }
+    });
+}
+
+async function drawRouteLines(routeKey, safeInternal) {
+    try {
+        const res = await fetch(`routes/${safeInternal}_line.json?t=${Date.now()}`);
+        if (res.ok) {
+            const data = await res.json();
+            data.features.forEach((f, i) => {
+                if (currentDirectionFilter === 'all' || currentDirectionFilter == i) {
+                    const coords = f.geometry.coordinates.map(c => [c[1], c[0]]);
+                    const color = routeColor(routeKey, i);
+                    const line = L.polyline(coords, { color, weight: 5, dashArray: (activeRoutes.size>1&&i===1)?'10 8':null }).addTo(map);
+                    routeLines[`${routeKey}_${i}`] = line;
+                }
+            });
+        }
+    } catch (e) {
+        console.error("Помилка завантаження лінії:", e);
+    }
+}
+
+// opts.silent === true пропускає перерахунок зупинок/маркерів — використовується
+// для пакетних операцій (масовий вибір), щоб уникнути O(n^2) навантаження,
+// коли кожен окремий тогл перераховував усе наново.
+async function toggleRoute(type, internal, opts = {}) {
+    const { silent = false } = opts;
+    const routeKey = `${type}-${internal}`;
+    const safeInternal = getSafeFileName(internal);
+    const btn = document.getElementById(`r-${type}-${internal}`);
+
+    if (activeRoutes.has(routeKey)) {
+        activeRoutes.delete(routeKey);
+        if (btn) btn.classList.remove('active');
+        removeRouteLines(routeKey);
+    } else {
+        activeRoutes.add(routeKey);
+        if (btn) btn.classList.add('active');
+
+        if (window.showRouteLines) {
+            await drawRouteLines(routeKey, safeInternal);
+        }
+    }
+
+    if (!silent) {
+        await updateVisibleStops();
+        if (window.lastV && typeof render === 'function') {
+            render(window.lastV);
+        }
+    }
+}
+
+// Вмикає/вимикає малювання ліній маршрутів на карті без зміни вибраних маршрутів.
+window.toggleRouteLinesDisplay = async () => {
+    window.showRouteLines = document.getElementById('show-route-lines').checked;
+
+    if (window.showRouteLines) {
+        await Promise.all(Array.from(activeRoutes).map(routeKey => {
+            const [, internal] = routeKey.split('-');
+            return drawRouteLines(routeKey, getSafeFileName(internal));
+        }));
+    } else {
+        Object.keys(routeLines).forEach(key => map.removeLayer(routeLines[key]));
+        routeLines = {};
+    }
+};
+
+        async function updateVisibleStops() {
+        let combinedMapping = { "0": [], "1": [] };
+
+        if (activeRoutes.size === 0) {
+            Object.keys(allStops).forEach(id => {
+                const marker = allStops[id].marker;
+                if (marker && map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+            return;
+        }
+
+        await Promise.all(Array.from(activeRoutes).map(async (routeKey) => {
+            const internal = routeKey.split('-')[1];
+            if (!stopsCache[internal]) {
+                stopsCache[internal] = await fetchRouteStopsMapping(internal);
+            }
+            combinedMapping["0"].push(...(stopsCache[internal]["0"] || []));
+            combinedMapping["1"].push(...(stopsCache[internal]["1"] || []));
+        }));
+
+        highlightRouteStops(combinedMapping);
+    }
+    window.switchTab = function(tab) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(`tab-content-${tab}`).classList.add('active');
+        
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(`tab${tab}`).classList.add('active');
+    };
+
+    window.setDirection = function(dir) {
+    currentDirectionFilter = dir;
+    
+    document.getElementById('dir-0').classList.toggle('active', dir === '0');
+    document.getElementById('dir-1').classList.toggle('active', dir === '1');
+    document.getElementById('dir-all').classList.toggle('active', dir === 'all');
+    
+    Object.keys(routeLines).forEach(key => map.removeLayer(routeLines[key]));
+    routeLines = {};
+
+    // Лінії перемальовуємо лише якщо їх показ увімкнено галочкою.
+    if (window.showRouteLines) {
+        Promise.all(Array.from(activeRoutes).map(routeKey => {
+            const [, internal] = routeKey.split('-');
+            return drawRouteLines(routeKey, getSafeFileName(internal));
+        }));
+    }
+
+    updateVisibleStops();
+
+    if (window.lastV && typeof render === 'function') {
+        render(window.lastV);
+    }
+};
+
+    window.applyStopVisibility = function() {
+        updateVisibleStops();
+    };
+
+    window.resetAllFiltersAndDirections = function() {
+        currentDirectionFilter = 'all';
+        document.getElementById('dir-0').classList.remove('active');
+        document.getElementById('dir-1').classList.remove('active');
+        document.getElementById('dir-all').classList.add('active');
+        
+        document.getElementById('hide-inactive-stops').checked = true;
+        
+        updateVisibleStops();
+
+        if (window.lastV && typeof render === 'function') {
+            render(window.lastV);
+        }
+    };
+    async function loadRouteData(routeNumber) {
+    try {
+        // Виконуємо запити паралельно для лінії та зупинок
+        const [lineResponse, stopsResponse] = await Promise.all([
+            fetch(`routes/${routeNumber}_line.json`),
+            fetch(`routes/${routeNumber}_stops.json`)
+        ]);
+
+        // Перевіряємо, чи існує файл зупинок (на випадок, якщо для деяких маршрутів він ще не створений)
+        if (!stopsResponse.ok) {
+            console.warn(`Файл зупинок для маршруту ${routeNumber} не знайдено.`);
+        }
+
+        const lineData = await lineResponse.json();
+        const stopsData = stopsResponse.ok ? await stopsResponse.json() : null;
+
+        // Рендеримо лінію на карті
+        renderRouteLine(lineData);
+
+        // Рендеримо зупинки, якщо дані успішно отримані
+        if (stopsData) {
+            renderRouteStops(stopsData);
+        }
+
+    } catch (error) {
+        console.error("Помилка при завантаженні даних маршруту:", error);
+    }
+}
+async function fetchRouteStopsMapping(internal) {
+    console.log("Отримано internal:", internal);
+    
+    const safeInternal = getSafeFileName(internal);
+    console.log("Після getSafeFileName:", safeInternal);
+
+    const url = `routes/${safeInternal}_stops.json?t=${Date.now()}`;
+    console.log("Фінальний запит до URL:", url);
+    
+    try {
+        const res = await fetch(url);
+        
+        if (!res.ok) {
+            console.error(`❌ Файл НЕ ЗНАЙДЕНО за адресою: ${url}`);
+            return { "0": [], "1": [] };
+        }
+
+        const text = await res.text();
+        try {
+            const data = JSON.parse(text);
+            return {
+                "0": (data.stops_0 || []).map(id => id.replace('stop_', '')),
+                "1": (data.stops_1 || []).map(id => id.replace('stop_', ''))
+            };
+        } catch (e) {
+            console.error("❌ Сервер віддав не JSON, а це:", text.substring(0, 50) + "...");
+            return { "0": [], "1": [] };
+        }
+        
+    } catch (e) {
+        console.error(`❌ Помилка мережі для ${internal}:`, e);
+        return { "0": [], "1": [] };
+    }
+}
+
+function removeRoute(routeKey) {
+    if (routeLines[routeKey]) {
+        map.removeLayer(routeLines[routeKey]);
+        delete routeLines[routeKey];
+        console.log(`Маршрут ${routeKey} видалено.`);
+    }
+}
+
+async function loadRouteLine(routeKey, internalName) {
+    const response = await fetch(`routes/${internalName}_line.json?t=${Date.now()}`);
+    const data = await response.json();
+
+    data.features.forEach((feature, index) => {
+        const coords = feature.geometry.coordinates.map(c => [c[1], c[0]]);
+        
+        const color = routeColor(routeKey, index);
+        const polyline = L.polyline(coords, { color: color, weight: 5, dashArray: (activeRoutes.size>1&&index===1)?'10 8':null }).addTo(map);
+        
+        routeLines[`${routeKey}_${index}`] = polyline;
+    });
+}
+    function debouncedRender(data) {
+        if (renderTimeout) clearTimeout(renderTimeout);
+        renderTimeout = setTimeout(() => render(data), 130);
+    }
+
+    onValue(ref(db, 'vehicle_mapping'), (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+        window.mapping = data;
+        console.log('✅ Mapping оновлено з Firebase');
+        
+        debouncedRender(window.lastV);
+    } else {
+        console.warn('⚠️ Дані в Firebase порожні або відсутні');
+    }
+}, (error) => {
+    console.error('❌ Помилка завантаження vehicle_mapping:', error);
+});
+
+    get(ref(db, 'shapes')).then(snap => {
+        if(snap.exists()) {
+            const rawShapes = snap.val();
+            Object.keys(rawShapes).forEach(rawKey => {
+                const name = rawKey.toString().trim();
+                let type = name.startsWith('Тр') ? 'trolley' : (name.startsWith('Т') ? 'tram' : 'bus');
+                const clean = getCleanRoute(name);
+                if(clean) shapesData[`${type}-${clean}`] = rawShapes[rawKey];
+            });
+        }
+    });
+
+    onValue(ref(db, 'vehicles'), snap => {
+        window.lastV = snap.val() || {};
+        document.querySelectorAll('.route-btn').forEach(el => el.classList.remove('online'));
+        Object.values(window.lastV).forEach(v => {
+            if(!v.r) return;
+            const cleanR = getCleanRoute(v.r);
+            const btn = document.getElementById(`r-${v.type}-${cleanR}`);
+            if(btn) btn.classList.add('online');
+        });
+        debouncedRender(window.lastV);
+    });
+
+    function getDirectionInfo(bearing) {
+        if (bearing === undefined || bearing === null) return { arrow: '', text: '' };
+        const b = ((Number(bearing) % 360) + 360) % 360;
+        const dirs = [
+            { text: 'Північ', arrow: '↑' },
+            { text: 'Пн-Схід', arrow: '↗' },
+            { text: 'Схід', arrow: '→' },
+            { text: 'Пд-Схід', arrow: '↘' },
+            { text: 'Південь', arrow: '↓' },
+            { text: 'Пд-Захід', arrow: '↙' },
+            { text: 'Захід', arrow: '←' },
+            { text: 'Пн-Захід', arrow: '↖' }
+        ];
+        const idx = Math.round(b / 45) % 8;
+        return dirs[idx];
+    }
+
+    function getClimateInfo(climate) {
+        if (climate === 3) return { icon: '❄️', text: '❄️ Кондиціонер' };
+        if (climate === 2) return { icon: '❄️½', text: '❄️½ Малий кондиціонер' };
+        if (climate === 1) return { icon: '🌬️', text: '🌬️ Вентиляція' };
+        if (climate === 0) return { icon: '', text: 'Без кондиціонера' };
+        return { icon: '', text: '' };
+    }
+
+    window.toggleStats = () => {
+        showStats = !showStats;
+        document.getElementById('stats-panel').style.display = showStats ? 'block' : 'none';
+        if (showStats) updateStats();
+    };
+
+    function isFreshV(v) {
+        return v && v.lat != null && v.lng != null && (Date.now() - parseInt(v.last_updated || 0) * 1000) / 1000 <= 1800;
+    }
+
+    function updateStats() {
+        const data = window.lastV || {};
+        const modelCount = {};
+        let filteredCount = 0;
+        let lowFloorCount = 0;
+        let acFullCount = 0;
+        let acOneCount = 0;
+        let ventCount = 0;
+
+        Object.entries(data).forEach(([id, v]) => {
+            if (!activeRoutes.has(`${v.type}-${getCleanRoute(v.r)}`)) return;
+            if (!isFreshV(v)) return;
+            
+            const entry = getCurrentMappingRecord(id);
+            const lowFloor = entry.l === 1 || v.low_floor === 1;
+            const climate = entry.c || 0;
+            const model = (entry.m || 'Невідома').toString().trim();
+            
+            modelCount[model] = (modelCount[model] || 0) + 1;
+            filteredCount++;
+
+            if (lowFloor) lowFloorCount++;
+            if (climate === 3) acFullCount++;
+            if (climate === 2) acOneCount++;
+            if (climate === 1) ventCount++;
+        });
+
+        const freshTotal = Object.values(data).filter(isFreshV).length;
+        let html = `<b>Зараз показано на карті:</b> ${Object.keys(markers).length}<br>`;
+        html += `<b>Усього активних ТЗ (свіжі дані):</b> ${freshTotal}<br>`;
+        html += `<b>З обраних маршрутів:</b> ${filteredCount}<br>`;
+        html += `♿ Низька підлога: ${lowFloorCount}<br>`;
+        html += `❄️❄️ Повноцінний конд.: ${acFullCount}<br>`;
+        html += `❄️ Один конд.: ${acOneCount}<br>`;
+        html += `🌬️ Вентиляція: ${ventCount}<br><br>`;
+
+        const modelHTML = Object.keys(modelCount).sort().map(model => {
+            const safeModel = model.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            return `
+                <label class="filter-option">
+                    <input type="checkbox" ${selectedModels.has(model) ? 'checked' : ''} 
+                           onchange="window.toggleModelFilter('${safeModel}')"> 
+                    ${model} <small>(${modelCount[model]})</small>
+                </label>
+            `;
+        }).join('');
+
+        document.getElementById('model-filters').innerHTML = modelHTML;
+        document.getElementById('stats-content').innerHTML = html;
+    }
+
+    window.toggleModelFilter = (model) => {
+        if (selectedModels.has(model)) selectedModels.delete(model);
+        else selectedModels.add(model);
+        debouncedRender(window.lastV);
+    };
+
+    function getFilterState() {
+        return {
+            acFull: document.getElementById('filter-ac-full').checked,
+            acOne: document.getElementById('filter-ac-one').checked,
+            vent: document.getElementById('filter-vent').checked,
+            low: document.getElementById('filter-low').checked
+        };
+    }
+
+    window.applyFilters = () => debouncedRender(window.lastV);
+    window.resetFilters = () => {
+        selectedModels.clear();
+        document.getElementById('filter-ac-full').checked = false;
+        document.getElementById('filter-ac-one').checked = false;
+        document.getElementById('filter-vent').checked = false;
+        document.getElementById('filter-low').checked = false;
+        debouncedRender(window.lastV);
+    };
+
+    function render(data) {
+        if(!data) return;
+        const sig=[...activeRoutes].sort().join('|');
+        if(sig!==lastRouteSig){ lastRouteSig=sig; recolorLines(); }
+
+        const filters = getFilterState();
+        const anyClimateFilterActive = filters.acFull || filters.acOne || filters.vent;
+
+        Object.keys(markers).forEach(id => {
+            const v = data[id];
+            if (!v || !activeRoutes.has(`${v.type}-${getCleanRoute(v.r)}`)) {
+                if (markers[id]) map.removeLayer(markers[id]);
+                delete markers[id];
+            }
+        });
+
+        Object.entries(data).forEach(([id, v]) => {
+            let cleanR = getCleanRoute(v.r);
+            if(!activeRoutes.has(`${v.type}-${cleanR}`)) return;
+
+            const lastUpdated = parseInt(v.last_updated || 0) * 1000;
+            const ageSec = Math.floor((Date.now() - lastUpdated) / 1000);
+            if (ageSec > 1800) { if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; } return; }
+
+            const mappingEntry = getCurrentMappingRecord(id);
+            const lowFloor = mappingEntry.l === 1 || v.low_floor === 1;
+            const climate = mappingEntry.c || 0;
+            const model = (mappingEntry.m || 'Невідома').toString().trim();
+
+            if (selectedModels.size > 0 && !selectedModels.has(model)) {
+                if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
+                return;
+            }
+
+            if (filters.low && !lowFloor) { 
+                if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; } 
+                return; 
+            }
+
+            if (anyClimateFilterActive) {
+                let match = false;
+                if (filters.acFull && climate === 3) match = true;
+                if (filters.acOne && climate === 2) match = true;
+                if (filters.vent && climate === 1) match = true;
+                if (!match) {
+                    if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
+                    return;
+                }
+            }
+
+            let displayNumber = '';
+            if (typeof v.p === 'string') {
+                displayNumber = v.p.includes(',') ? v.p.split(',')[0].trim() : v.p;
+            } else if (Array.isArray(v.p) && v.p.length) {
+                const first = v.p[0];
+                displayNumber = (first && typeof first === 'object') ? (first.p || '') : (first || '');
+            } else if (v.p && typeof v.p === 'object') {
+                displayNumber = v.p.p || '';
+            }
+            if (!displayNumber) displayNumber = mappingEntry.p || v.raw_p || '';
+
+            // Неідентифікований борт: на маркері — номер з API (license_plate), ID — маленьким внизу.
+            const showPlate = !v.has_bort && !!v.lp;
+            if (showPlate) displayNumber = v.lp;
+            const rawIdText = v.raw_p || id;
+            const idSub = showPlate ? `<div class="vehicle-id-sub">ID ${rawIdText}</div>` : '';
+
+            let color = v.has_bort 
+                ? (v.type === 'tram' ? '#e67e22' : (v.type === 'trolley' ? '#9b59b6' : '#e74c3c')) 
+                : '#2c3e50';
+
+            const climateInfo = getClimateInfo(climate);
+
+            const typeIcons = { tram: '🚋', trolley: '🚎', bus: '🚌' };
+
+            // "Поза маршрутом" рахуємо геометрично (наша власна лінія routes/{name}_line.json) —
+            // це коректно працює. А напрямок — з бекенда (v.dir), похідного від кінцевої (headsign)
+            // рейсу, а не від геометрії: лінії "туди"/"назад" часто йдуть по одній вулиці й майже
+            // накладаються, тому геометричне визначення напрямку там "плаваюче" — кінцева надійніша.
+            const routeKey = `${v.type}-${cleanR}`;
+            const rc = routeColor(routeKey, 0), multiCls = activeRoutes.size>1 ? ' multi' : '';
+            const routeMatch = getRouteMatch(routeKey, getSafeFileName(cleanR), v.lat, v.lng, v.b, v.s);
+            const offRoute = routeMatch.offRoute;
+            const offRouteFlag = offRoute ? '<span class="off-route-flag">⚠️</span>' : '';
+
+            // Підсвітка за напрямком схеми (0 = "Туди", 1 = "Назад").
+            // Поки ТЗ поза маршрутом — напрямок не підсвічуємо, щоб не плутати два різні сигнали.
+            let dirClass = '';
+            if (!offRoute && (v.dir === 0 || v.dir === '0')) dirClass = 'dir-0';
+            else if (!offRoute && (v.dir === 1 || v.dir === '1')) dirClass = 'dir-1';
+
+            let dimClass = '';
+            if (currentDirectionFilter !== 'all' && dirClass && currentDirectionFilter !== dirClass.replace('dir-', '')) {
+                dimClass = 'dir-dim';
+            }
+
+            const markerHtml = useAltIcons ? `
+                <div style="--rc:${rc}" class="vehicle-marker-wrapper vehicle-alt${multiCls}${lowFloor ? ' low-floor' : ''}${offRoute ? ' off-route' : ''} ${dirClass} ${dimClass}">
+                    ${offRouteFlag}
+                    <div class="vehicle-alt-badge" style="background:${color};">
+                        <span class="vehicle-alt-icon">${typeIcons[v.type] || '🚐'}</span>
+                        <span class="vehicle-alt-arrow" style="transform: rotate(${v.b ?? 0}deg);">▲</span>
+                    </div>
+                    <div class="vehicle-title-box">
+                        ${getDisplayName(cleanR)} • ${displayNumber} ${climateInfo.icon}
+                    </div>
+                    ${idSub}
+                </div>
+            ` : `
+                <div style="--rc:${rc}" class="vehicle-marker-wrapper${multiCls}${lowFloor ? ' low-floor' : ''}${offRoute ? ' off-route' : ''} ${dirClass} ${dimClass}">
+                    ${offRouteFlag}
+                    <div class="vehicle-arrow-box" style="transform: translate(-50%, -50%) rotate(${v.b ?? 0}deg); color:${color};">⬆️</div>
+                    <div class="vehicle-title-box">
+                        ${getDisplayName(cleanR)} • ${displayNumber} ${climateInfo.icon}
+                    </div>
+                    ${idSub}
+                </div>
+            `;
+
+            const directionInfo = getDirectionInfo(v.b);
+
+            const popup = `<div style="font-size:13px; line-height:1.4;">
+                <b style="color:${color}">${getDisplayName(cleanR)}</b><br>
+                ${offRoute ? '<span style="color:#7f8c8d; font-weight:700;">⚠️ Поза маршрутом (немає на лінії)</span><br>' : ''}
+                ${model ? `<b>Модель:</b> ${model}<br>` : ''}
+                ${lowFloor ? '<span style="color:#2ecc71">♿ Низька підлога</span><br>' : ''}
+                ${climateInfo.text ? `<span>${climateInfo.text}</span><br>` : ''}
+                <b>Номер:</b> ${displayNumber}<br>
+                ${(v.lp && !showPlate && String(v.lp).replace(/[^A-Za-zА-Яа-яІіЇїЄє0-9]/g, '').toUpperCase() !== String(displayNumber).replace(/[^A-Za-zА-Яа-яІіЇїЄє0-9]/g, '').toUpperCase()) ? `<b>Номер (API):</b> ${v.lp}<br>` : ''}
+                ${!v.has_bort ? `<b>ID трекера:</b> ${rawIdText}<br>` : ''}
+                ${v.dest ? `<b>Прямує до:</b> ${v.dest}<br>` : ''}
+                ${directionInfo.text ? `<b>Напрям руху:</b> ${directionInfo.arrow} ${directionInfo.text}<br>` : ''}
+                <b>Швидкість:</b> ${v.s ?? 0} км/год<br>
+                <b>Оновлено:</b> ${ageSec} сек тому
+            </div>`;
+
+            if (markers[id]) {
+                const marker = markers[id];
+                marker.setLatLng([v.lat, v.lng]);
+                const el = marker.getElement();
+                if (el) el.innerHTML = markerHtml;
+                marker.setPopupContent(popup);
+            } else {
+                const icon = L.divIcon({
+                    html: markerHtml,
+                    className: '',
+                    iconSize: [150, 78],
+                    iconAnchor: [75, 38]
+                });
+                markers[id] = L.marker([v.lat, v.lng], {icon}).addTo(map).bindPopup(popup);
+            }
+        });
+
+        if (showStats) updateStats();
+    }
+
+    initAllRouteButtons();
+    initAllStops();
+    startForecastAutoUpdate();
+    window.lastV = {};
+
+    window.massSelect = async (selectAll) => {
+    const buttonsArray = Array.from(existingButtons);
+
+    // silent:true — кожен окремий тогл більше НЕ перераховує зупинки і НЕ
+    // перемальовує всі маркери; це й спричиняло "зависання" схеми маршрутів
+    // при "Увімкнути всі" (робота виконувалась N разів замість одного).
+    await Promise.all(buttonsArray.map(async (routeKey) => {
+        const [type, internal] = routeKey.split('-');
+        const isActive = activeRoutes.has(routeKey);
+
+        if (selectAll !== isActive) {
+            await toggleRoute(type, internal, { silent: true });
+        }
+    }));
+
+    await updateVisibleStops();
+    
+    if (typeof render === 'function' && window.lastV) {
+        render(window.lastV);
+    }
+    
+    console.log("✅ Масовий вибір виконано миттєво.");
+};
+setInterval(() => {
+        if (document.getElementById('hide-inactive-stops').checked) {
+            const activeStops = new Set();
+            Object.keys(allStops).forEach(id => {
+                const data = allStops[id];
+                if (data.marker && (data.isOnRoute || false)) activeStops.add(id);
+            });
+        }
+    }, 800);
+</script>
+</body>
+</html>
